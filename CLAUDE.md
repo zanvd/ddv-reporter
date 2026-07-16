@@ -21,6 +21,13 @@ basename across the three folders (e.g. `0001-...`):
 
 Specs and plans are self-contained HTML documents (inline `<style>`, no assets).
 
+**Chunk approval is mandatory and never bypassed.** The implementer's
+stop-after-each-chunk review is a hard gate, not a formality — this holds even
+in background or "autonomous" sessions. A background session only means the
+user may not be watching live; it does not mean approval has been delegated
+away. Never instruct an agent to pre-approve its own chunks or proceed past a
+review checkpoint on the user's behalf.
+
 ## Tech stack
 
 - **Vanilla HTML + CSS + ES-module JavaScript. No build step, no framework, no
