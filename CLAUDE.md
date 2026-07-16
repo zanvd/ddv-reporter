@@ -68,6 +68,9 @@ Specs and plans are self-contained HTML documents (inline `<style>`, no assets).
 - **KISS / YAGNI.** Simplest thing that satisfies the spec/plan. No speculative
   hooks, layers, or dependencies — every added piece of complexity must earn its
   place against a requirement.
+- **Commit messages.** Follow Commitizen/Conventional Commits: `type: subject`
+  (e.g. `feat:`, `fix:`, `test:`, `chore:`, `ci:`, `docs:`, `refactor:`), imperative
+  mood, no capitalized first letter after the colon, no trailing period.
 
 ## Domain gotchas
 
