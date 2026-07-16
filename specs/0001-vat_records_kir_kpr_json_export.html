@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DDV Reporter — Initial Implementation Specification</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --muted: #5a5a5a;
+    --accent: #0b5c8a;
+    --border: #d5d9dd;
+    --bg-soft: #f6f8fa;
+    --code-bg: #eef1f4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    line-height: 1.55;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 5rem;
+  }
+  h1 { font-size: 1.8rem; line-height: 1.2; margin: 0 0 0.4rem; }
+  h2 {
+    font-size: 1.25rem;
+    margin: 2.4rem 0 0.8rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 2px solid var(--border);
+  }
+  h3 { font-size: 1.05rem; margin: 1.6rem 0 0.6rem; color: var(--accent); }
+  p, li { font-size: 0.95rem; }
+  code {
+    background: var(--code-bg);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85em;
+  }
+  pre {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.65rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--bg-soft); font-weight: 600; }
+  tr:nth-child(even) td { background: #fbfcfd; }
+  .meta {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin: 0.15rem 0;
+  }
+  .meta strong { color: var(--fg); }
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--bg-soft);
+    padding: 0.7rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.9rem;
+  }
+  .changelog {
+    border-left: 4px solid #b8860b;
+    background: #fdf9ef;
+    padding: 0.6rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.88rem;
+  }
+  ul { padding-left: 1.3rem; }
+  a { color: var(--accent); word-break: break-word; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  .sources li { margin-bottom: 0.6rem; }
+</style>
+</head>
+<body>
+
+<h1>DDV Reporter — Initial Implementation Specification</h1>
+<p class="meta"><strong>Version:</strong> 1.2 (draft for initial implementation)</p>
+<p class="meta"><strong>Date:</strong> 2026-07-15</p>
+<p class="meta"><strong>Status:</strong> Confirmed — ready for implementation planning</p>
+<p class="meta"><strong>Scope:</strong> Product / requirements only. No technical, architectural, or implementation decisions.</p>
+
+<div class="changelog">
+  <strong>Changelog:</strong> v1.2 — finalized user-facing field labels in Slovenian using FURS's official "Naziv polja" terminology (§5, §6); aligned the <code>ODBDELEZ</code> label to the DDV-O form's wording ("Izračunavam odbitni delež", §5); added requirement that all user-facing text is Slovenian (§3). v1.1 — <code>VRACILO</code> (VAT-refund request) moved into scope for v1 (§3, §5, §7); removed from Non-goals (§9).
+</div>
+
+<h2>1. Summary</h2>
+<p>
+  A standalone, client-side web application that lets a Slovenian VAT payer enter their VAT
+  ledger data through a form with descriptive (human-readable) labels, and download a
+  correctly structured <strong>JSON</strong> file conforming to FURS's KIR/KPR VAT-records
+  specification. No submission, accounts, or persistence — the single deliverable action is
+  producing a downloadable JSON file.
+</p>
+
+<h2>2. Background / motivation</h2>
+<p>
+  Since <strong>1 July 2025</strong> (ZDDV-1O amendment to the Slovenian VAT Act, ZDDV-1),
+  every person identified for VAT in Slovenia must, for each tax period, submit to FURS two
+  prescribed VAT records in addition to the DDV-O return:
+</p>
+<ul>
+  <li><strong>Evidenca obračunanega DDV</strong> — the record of <em>charged / output</em> VAT,
+    kept as the book of <strong>issued</strong> invoices, FURS code <strong>KIR</strong>
+    (Knjiga izdanih računov).</li>
+  <li><strong>Evidenca odbitka DDV</strong> — the record of <em>deducted / input</em> VAT,
+    kept as the book of <strong>received</strong> invoices, FURS code <strong>KPR</strong>
+    (Knjiga prejetih računov).</li>
+</ul>
+<p>
+  FURS accepts these records in <strong>XML, JSON, or CSV</strong>. Both records are delivered
+  together in a single file built around the <code>DDV_KIR_KPR</code> structure, which contains
+  a header plus two arrays of line entries (one per invoice/document). This multi-entry,
+  charged-vs-deducted, JSON-capable format is exactly what this application targets.
+</p>
+<div class="callout">
+  <strong>Important distinction:</strong> This is <em>not</em> the <strong>DDV-O</strong> VAT
+  return. DDV-O is a summary form whose eDavki import format is XML only and which has no
+  per-line/multi-entry JSON representation. The KIR/KPR records specified here are what FURS
+  then uses to pre-fill the DDV-O. This application produces the <strong>KIR/KPR records
+  file</strong>, nothing else.
+</div>
+
+<h2>3. Scope</h2>
+<h3>In scope (v1)</h3>
+<ul>
+  <li>Single-page form to capture:
+    <ul>
+      <li>Header (taxpayer, reporting period, refund-request flag, deductible-proportion flag).</li>
+      <li>Any number of <strong>charged</strong> (KIR / output) entries.</li>
+      <li>Any number of <strong>deducted</strong> (KPR / input) entries.</li>
+    </ul>
+  </li>
+  <li>Add / edit / remove entries in each list.</li>
+  <li>Basic client-side field-format validation (see §7).</li>
+  <li>A <strong>Download</strong> button that assembles a valid <code>DDV_KIR_KPR</code> JSON
+    document and offers it as a file download.</li>
+  <li><strong>All user-facing text is in Slovenian</strong> — every string the user sees (field
+    labels, validation / error messages, buttons, hints, empty states) is Slovenian, using FURS's
+    official field terminology ("Naziv polja") for the ledger fields. The FURS field codes
+    (<code>P2</code>, <code>P14</code>, …) are internal to the JSON only and are never shown to
+    the user.</li>
+</ul>
+<h3>Out of scope (v1) — see §9 for the full non-goals list</h3>
+<ul>
+  <li>The DDV-O return itself, and any XML or CSV output.</li>
+  <li>Direct submission to eDavki (REST/SOAP web service or ZIP upload).</li>
+  <li>Self-disclosure (samoprijava) and other non-standard treatment cases.</li>
+  <li>Foreign-taxpayer / tax-representative filing.</li>
+  <li>User accounts, authentication, and data persistence between sessions.</li>
+</ul>
+
+<h2>4. Target output format</h2>
+<p>
+  The downloaded file is a single JSON document with this shape (field codes are FURS's; see the
+  mapping in §6):
+</p>
+<pre>DDV_KIR_KPR
+├── Glava                 (header — required)
+├── Lista_KIR             (charged / output records)
+│   └── KIR: [ entry, entry, … ]
+└── Lista_KPR             (deducted / input records)
+    └── KPR: [ entry, entry, … ]</pre>
+<p>
+  The "multiple entries for charged and deducted VAT" requirement is realized by the
+  <code>KIR</code> and <code>KPR</code> arrays. Each array item is one ledger line (one
+  invoice/document).
+</p>
+<p>
+  Records with no entries: if the user enters only charged (or only deducted) records, the file
+  still validly carries the other list as empty/absent, and the corresponding header flag is set
+  accordingly (see <code>KIR</code> / <code>KPR</code> flags in §5).
+</p>
+
+<h2>5. Header requirements (<code>Glava</code>)</h2>
+<p>
+  The header is required and carries taxpayer- and period-level data. v1 collects the minimum
+  mandatory set plus the VAT-refund request flag.
+</p>
+<table>
+  <thead>
+    <tr><th>User-facing label (Slovenian)</th><th>FURS field</th><th>Required</th><th>Value in v1</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Davčna številka zavezanca</td><td><code>TaxPayerID</code></td><td>Yes</td><td>User input, exactly 8 digits, no "SI" prefix</td></tr>
+    <tr><td>Obdobje poročanja — od</td><td><code>OBDOBJE_OD</code></td><td>Yes</td><td>Derived from the period the user selects, <code>YYYY-MM-DD</code> (first day of period)</td></tr>
+    <tr><td>Obdobje poročanja — do</td><td><code>OBDOBJE_DO</code></td><td>Yes</td><td>Derived from the period the user selects, <code>YYYY-MM-DD</code> (last day of period)</td></tr>
+    <tr><td>(implicitno) vsebuje evidenco izdanih računov</td><td><code>KIR</code></td><td>Yes</td><td>Boolean, set automatically: <code>true</code> if ≥1 charged entry exists, else <code>false</code></td></tr>
+    <tr><td>(implicitno) vsebuje evidenco prejetih računov</td><td><code>KPR</code></td><td>Yes</td><td>Boolean, set automatically: <code>true</code> if ≥1 deducted entry exists, else <code>false</code></td></tr>
+    <tr><td>Zahtevam vračilo presežka DDV</td><td><code>VRACILO</code></td><td>Optional</td><td>User checkbox (default: unchecked / <code>false</code>). Boolean (DA/NE). No dependent fields; the one schema rule is inactive in v1 — see §7.</td></tr>
+    <tr><td>Izračunavam odbitni delež</td><td><code>ODBDELEZ</code></td><td>Yes</td><td>User checkbox (default: unchecked / <code>false</code>). Wording matches DDV-O box 03.</td></tr>
+  </tbody>
+</table>
+<p>
+  <strong>Period selection (product behavior):</strong> the user chooses a <strong>period
+  type</strong> — <em>Vrsta obdobja poročanja</em>, with options <em>Mesečno</em> (monthly) or
+  <em>Četrtletno</em> (quarterly) — plus the specific <strong>month/quarter</strong>
+  (<em>Mesec</em> / <em>Četrtletje</em>) and <strong>year</strong> (<em>Leto</em>). From this the
+  application derives <code>OBDOBJE_OD</code>, <code>OBDOBJE_DO</code>, and each entry's
+  <code>OBDOBJE</code> (see §6). The user does not type raw dates or the <code>MMMM</code> code.
+</p>
+<p>
+  <strong>Header fields intentionally omitted in v1</strong> (optional in the schema, tied to
+  out-of-scope cases): <code>TUJEC1</code>, <code>TUJEC2</code> (foreign taxpayer/representative),
+  <code>NACIN</code> (late-filing treatment), <code>INSPOS</code> (insolvency),
+  <code>PREDLODO</code> (filing on tax-authority decision), <code>OPOMBA</code> (free-text note).
+</p>
+
+<h2>6. Entry requirements</h2>
+<p>Both entry types share two auto-managed fields:</p>
+<ul>
+  <li><strong><code>ZAPST</code></strong> (sequential number) — assigned automatically by the app,
+    starting at 1 and strictly consecutive within each list (FURS rejects non-consecutive
+    numbering).</li>
+  <li><strong><code>OBDOBJE</code></strong> (tax period, <code>MMMM</code> format) — derived from
+    the header period, identical for every entry in the file. <code>MMMM</code> = two-digit start
+    month + two-digit end month (e.g. monthly June → <code>0606</code>; Q2 → <code>0406</code>).</li>
+</ul>
+<p>
+  Every entry also carries <strong><code>OBRAVNAVA</code> = <code>"1"</code></strong> (normal
+  return) — hardcoded in v1. Self-disclosure values (<code>"2"</code>, <code>"3"</code>) and their
+  companion fields (<code>OBDOBJE88</code>, <code>DAVEK88</code>) are out of scope.
+</p>
+
+<h3>6.1 Charged / output entry — <code>Lista_KIR</code> → <code>KIR</code></h3>
+<table>
+  <thead>
+    <tr><th>User-facing label (Slovenian)</th><th>FURS field</th><th>Required</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Zaporedna številka</td><td><code>ZAPST</code></td><td>Yes</td><td>Auto-assigned, consecutive</td></tr>
+    <tr><td>Davčno obdobje</td><td><code>OBDOBJE</code></td><td>Yes</td><td>Auto-derived, <code>MMMM</code></td></tr>
+    <tr><td>Datum knjiženja listine</td><td><code>P2</code></td><td>Yes</td><td><code>YYYY-MM-DD</code>, not in future</td></tr>
+    <tr><td>Številka listine</td><td><code>P3</code></td><td>Yes</td><td>Text, max 250 chars</td></tr>
+    <tr><td>Datum listine</td><td><code>P4</code></td><td>Yes</td><td><code>YYYY-MM-DD</code>, not in future</td></tr>
+    <tr><td>Koda države kupca</td><td><code>P6</code></td><td>Optional</td><td>ISO-3166 2-letter, uppercase; paired with <code>P6DS</code></td></tr>
+    <tr><td>Identifikacijska številka kupca za DDV (brez kode države)</td><td><code>P6DS</code></td><td>Optional</td><td>Max 25 chars; paired with <code>P6</code></td></tr>
+    <tr><td>Vrednost dobav blaga in storitev (brez DDV)</td><td><code>P7</code></td><td>Optional (core amount)</td><td>Amount</td></tr>
+    <tr><td>Obračunan DDV po 22 %</td><td><code>P14</code></td><td>Optional (core amount)</td><td>Amount</td></tr>
+    <tr><td>Obračunan DDV po 9,5 %</td><td><code>P15</code></td><td>Optional (core amount)</td><td>Amount</td></tr>
+    <tr><td>Obračunan DDV po 5 %</td><td><code>P16</code></td><td>Optional (core amount)</td><td>Amount</td></tr>
+  </tbody>
+</table>
+
+<h3>6.2 Deducted / input entry — <code>Lista_KPR</code> → <code>KPR</code></h3>
+<table>
+  <thead>
+    <tr><th>User-facing label (Slovenian)</th><th>FURS field</th><th>Required</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Zaporedna številka</td><td><code>ZAPST</code></td><td>Yes</td><td>Auto-assigned, consecutive</td></tr>
+    <tr><td>Davčno obdobje</td><td><code>OBDOBJE</code></td><td>Yes</td><td>Auto-derived, <code>MMMM</code></td></tr>
+    <tr><td>Datum knjiženja listine</td><td><code>P2</code></td><td>Yes</td><td><code>YYYY-MM-DD</code>, not in future</td></tr>
+    <tr><td>Številka listine</td><td><code>P3</code></td><td>Yes</td><td>Text, max 250 chars</td></tr>
+    <tr><td>Datum prejema listine</td><td><code>P4</code></td><td>Yes</td><td><code>YYYY-MM-DD</code>, not in future</td></tr>
+    <tr><td>Datum listine</td><td><code>P5</code></td><td>Yes</td><td><code>YYYY-MM-DD</code>, not in future</td></tr>
+    <tr><td>Firma / ime in sedež dobavitelja</td><td><code>P6</code></td><td>Yes</td><td>Text, max 250 chars</td></tr>
+    <tr><td>Koda države dobavitelja</td><td><code>P7</code></td><td>Yes*</td><td>ISO-3166 2-letter, uppercase (*see note below)</td></tr>
+    <tr><td>Identifikacijska številka dobavitelja za DDV (brez kode države)</td><td><code>P7DS</code></td><td>Yes</td><td>Max 25 chars</td></tr>
+    <tr><td>Vrednost nabav blaga in storitev (brez DDV)</td><td><code>P8</code></td><td>Optional (core amount)</td><td>Amount</td></tr>
+    <tr><td>Odbitni DDV po 22 %</td><td><code>P18</code></td><td>Optional (core amount)</td><td>Amount</td></tr>
+    <tr><td>Odbitni DDV po 9,5 %</td><td><code>P19</code></td><td>Optional (core amount)</td><td>Amount</td></tr>
+    <tr><td>Odbitni DDV po 5 %</td><td><code>P20</code></td><td>Optional (core amount)</td><td>Amount</td></tr>
+    <tr><td>Pavšalno nadomestilo 8 %</td><td><code>P21</code></td><td>Optional (core amount)</td><td>Amount</td></tr>
+  </tbody>
+</table>
+<div class="callout">
+  <strong>Note on <code>P7</code> (supplier country):</strong> The official FURS
+  <strong>JSON Schema</strong> lists <code>P7</code> as a required KPR field, while the FURS
+  field-definition spreadsheet marks it optional. v1 follows the JSON Schema and treats it as
+  required, since that is what the file must satisfy to validate.
+</div>
+<p>
+  <strong>Core-amount handling:</strong> Amount fields are technically optional in the schema,
+  but a ledger line with no monetary values is not meaningful. v1 exposes only the common
+  domestic-supply amount fields listed above (net base + VAT/deductible VAT by the standard
+  rates). All other amount fields in the schema — intra-EU acquisitions/supplies,
+  reverse-charge/self-assessment, distance sales, imports, exempt supplies, real-estate and
+  fixed-asset breakdowns, non-deductible VAT, etc. — are <strong>out of scope for v1</strong>.
+  An amount field left blank by the user is <strong>omitted</strong> from the JSON entry rather
+  than written as <code>0</code>.
+</p>
+
+<h2>7. Validation rules</h2>
+<p>
+  Derived from the FURS JSON Schema (<code>DDV_KIR_KPR_1.json</code>) and the FURS
+  validation-rules sheet (<code>KIR_KPR_pravila.xlsx</code>). v1 performs client-side
+  <strong>format</strong> validation only; it does not perform any check that requires FURS
+  online services (e.g. tax-register existence of a VAT ID).
+</p>
+<table>
+  <thead>
+    <tr><th>Rule</th><th>Detail</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Tax number (<code>TaxPayerID</code>)</td><td>Exactly 8 digits <code>^[0-9]{8}$</code>.</td></tr>
+    <tr><td>Amounts</td><td>Numeric; <strong>at most 2 decimal places</strong>; strictly between −5,000,000,000 and +5,000,000,000; negative values allowed.</td></tr>
+    <tr><td>Dates (<code>P2</code>,<code>P4</code>,<code>P5</code>, period)</td><td><code>YYYY-MM-DD</code>. Line-level dates may not be in the future.</td></tr>
+    <tr><td><code>OBDOBJE</code> (<code>MMMM</code>)</td><td>4 digits; start month ≤ end month; monthly or quarterly only (e.g. <code>0101</code>, <code>0606</code>, <code>0103</code>, <code>0406</code>, <code>0709</code>, <code>1012</code>).</td></tr>
+    <tr><td><code>OBDOBJE_OD</code> / <code>OBDOBJE_DO</code></td><td>Consistent with the selected period; each entry's <code>OBDOBJE</code> must match the header period.</td></tr>
+    <tr><td><code>ZAPST</code></td><td>Consecutive within each list (1, 2, 3, …).</td></tr>
+    <tr><td>Country codes (<code>P6</code>,<code>P7</code>)</td><td>2-letter uppercase per ISO-3166; allowed set is EU member states + <code>SI</code> + <code>XI</code> (Northern Ireland); Greece may be <code>GR</code> or <code>EL</code>.</td></tr>
+    <tr><td>Country/VAT-ID pairing (KIR)</td><td><code>P6</code> and <code>P6DS</code> must be <strong>both present or both empty</strong>.</td></tr>
+    <tr><td>VAT-ID format (<code>P6DS</code>, <code>P7DS</code>)</td><td>Max 25 characters; entered <strong>without</strong> the country-code prefix.</td></tr>
+    <tr><td><code>VRACILO</code> (refund request)</td><td>Boolean (DA/NE). No dependent fields become required when it is <code>true</code>. The only rule in the FURS rules sheet is <em>"if <code>TUJEC1</code> and <code>TUJEC2</code> are present, <code>VRACILO</code> must be <code>false</code>"</em> — inactive in v1 because foreign-taxpayer fields are never produced (§9). Independent of <code>ODBDELEZ</code>.</td></tr>
+    <tr><td><code>OBRAVNAVA</code></td><td>Always <code>"1"</code> in v1.</td></tr>
+    <tr><td>Text fields</td><td>Max 250 characters (<code>P3</code>, <code>P5</code>/KIR notes, supplier name, etc.).</td></tr>
+    <tr><td>Required fields</td><td>Enforce presence of all fields marked "Required" in §5 and §6 before allowing download.</td></tr>
+  </tbody>
+</table>
+<p>
+  Behavior on validation failure: the Download action is blocked (or the offending field is
+  flagged) until all format rules pass, so the app never produces a structurally invalid file.
+</p>
+
+<h2>8. Download behavior</h2>
+<ul>
+  <li>A single <strong>Download</strong> button assembles the current form state into one
+    <code>DDV_KIR_KPR</code> JSON document and offers it to the user as a file download.</li>
+  <li>The button runs the §7 validations first; if any fail, download is prevented and the user
+    is shown what to fix.</li>
+  <li>Blank optional amount fields are omitted from entries; the <code>KIR</code>/<code>KPR</code>
+    header flags reflect which lists actually contain entries.</li>
+  <li>Amounts are written as JSON numbers with at most two decimal places.</li>
+  <li>Everything happens client-side; no data leaves the browser.</li>
+</ul>
+
+<h2>9. Non-goals (explicitly deferred)</h2>
+<p>The following are <strong>out of scope</strong> for the initial implementation:</p>
+<ul>
+  <li><strong>DDV-O return</strong> generation, and any <strong>XML or CSV</strong> output — JSON
+    KIR/KPR only.</li>
+  <li><strong>Direct submission to FURS/eDavki</strong> — no REST/SOAP web-service call, no ZIP
+    upload; the user submits the downloaded file themselves.</li>
+  <li><strong>Self-disclosure (samoprijava)</strong> and other non-standard treatments —
+    <code>OBRAVNAVA</code> is fixed to <code>"1"</code>; <code>OBDOBJE88</code> and
+    <code>DAVEK88</code> are not produced.</li>
+  <li><strong>Foreign taxpayer / tax-representative filing</strong> — <code>TUJEC1</code>,
+    <code>TUJEC2</code> and related refund/deductible restrictions are not produced.</li>
+  <li><strong>Non-core amount fields</strong> — intra-EU, reverse-charge/self-assessment,
+    distance sales, imports, exempt supplies, real-estate and fixed-asset breakdowns,
+    non-deductible VAT, etc.</li>
+  <li><strong>Tax-register (RDZ) lookups</strong> and any other validation requiring FURS online
+    services.</li>
+  <li><strong>User accounts, authentication, roles, authorization</strong> (e.g. filing on behalf
+    of another taxpayer).</li>
+  <li><strong>Persistence between sessions</strong> (no saved drafts, no database, no server-side
+    storage).</li>
+  <li>Header extras: <code>NACIN</code>, <code>INSPOS</code>, <code>PREDLODO</code>,
+    <code>OPOMBA</code>.</li>
+</ul>
+
+<h2>10. Legal / regulatory references and sources</h2>
+<ul>
+  <li><strong>ZDDV-1</strong> (Zakon o davku na dodano vrednost) as amended by
+    <strong>ZDDV-1O</strong>, introducing the obligation (from 1 July 2025) to submit the
+    evidence of charged VAT and evidence of deducted VAT for each tax period.</li>
+  <li><strong>Standard Slovenian VAT rates</strong> reflected in the fields: 22 % (standard),
+    9.5 % (reduced), 5 % (second reduced), 8 % (flat-rate compensation for farmers).</li>
+  <li><strong>FURS technical package</strong> <code>DDV_KIR_KPR.zip</code> (JSON Schema
+    <code>DDV_KIR_KPR_1.json</code>, example JSON, field mapping
+    <code>DDV_KIR_KPR_Polja.xlsx</code>, validation rules <code>KIR_KPR_pravila.xlsx</code>), from
+    the eDavki "KIR/KPR web service" area — the authoritative source for all field codes,
+    mandatory-field sets, and formats in this spec (including <code>VRACILO</code> being an
+    optional boolean with the single foreign-taxpayer dependency documented in §7).</li>
+</ul>
+<p><strong>Sources:</strong></p>
+<ul class="sources">
+  <li>eDavki — KIR/KPR web-service technical specification &amp; schema package:
+    <a href="https://edavki.durs.si/OpenPortal/Dokumenti/spletni_servis_za_sprejem_kir_kpr.docx">https://edavki.durs.si/OpenPortal/Dokumenti/spletni_servis_za_sprejem_kir_kpr.docx</a></li>
+  <li>eDavki — Submission of VAT records (evidence obračunanega DDV in odbitka DDV):
+    <a href="https://edavki.durs.si/edavkiportal/openportal/CommonPages/Opdynp/PageD.aspx?category=kirkpr">https://edavki.durs.si/edavkiportal/openportal/CommonPages/Opdynp/PageD.aspx?category=kirkpr</a></li>
+  <li>FURS — detailed description: VAT evidence &amp; pre-filled VAT return:
+    <a href="https://www.fu.gov.si/fileadmin/Internet/Davki_in_druge_dajatve/Podrocja/Davek_na_dodano_vrednost/Opis/Evidenci_obracunanega_DDV_in_odbitka_DDV_ter_predizpolnitev_obracuna_DDV.doc">https://www.fu.gov.si/fileadmin/Internet/Davki_in_druge_dajatve/Podrocja/Davek_na_dodano_vrednost/Opis/Evidenci_obracunanega_DDV_in_odbitka_DDV_ter_predizpolnitev_obracuna_DDV.doc</a></li>
+  <li>gov.si — From 1 July 2025, mandatory submission of the VAT evidence:
+    <a href="https://www.gov.si/en/">https://www.gov.si/en/</a></li>
+  <li>eDavki — Import of data from XML/JSON/CSV files:
+    <a href="https://edavki.durs.si/EdavkiPortal/openportal/CommonPages/Opdynp/PageD.aspx?category=technicals_manualimport">https://edavki.durs.si/EdavkiPortal/openportal/CommonPages/Opdynp/PageD.aspx?category=technicals_manualimport</a></li>
+</ul>
+
+<h2>11. Open questions</h2>
+<p>
+  None blocking. Items deliberately deferred to a later version are captured in §9 (Non-goals).
+  If a future version adds intra-EU/reverse-charge scenarios, the additional amount fields
+  already exist in the same FURS schema and can be layered onto this structure without changing
+  the file's overall shape. Note that if foreign-taxpayer filing (<code>TUJEC1</code>/<code>TUJEC2</code>)
+  is ever brought into scope, the <code>VRACILO</code> refund flag must then be constrained to
+  <code>false</code> for those filings (§7).
+</p>
+
+</body>
+</html>
