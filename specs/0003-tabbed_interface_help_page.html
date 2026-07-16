@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DDV Reporter — Tabbed Interface &amp; Help (Pomoč) Page Specification</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --muted: #5a5a5a;
+    --accent: #0b5c8a;
+    --border: #d5d9dd;
+    --bg-soft: #f6f8fa;
+    --code-bg: #eef1f4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    line-height: 1.55;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 5rem;
+  }
+  h1 { font-size: 1.8rem; line-height: 1.2; margin: 0 0 0.4rem; }
+  h2 {
+    font-size: 1.25rem;
+    margin: 2.4rem 0 0.8rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 2px solid var(--border);
+  }
+  h3 { font-size: 1.05rem; margin: 1.6rem 0 0.6rem; color: var(--accent); }
+  p, li { font-size: 0.95rem; }
+  code {
+    background: var(--code-bg);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85em;
+  }
+  pre {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.65rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--bg-soft); font-weight: 600; }
+  tr:nth-child(even) td { background: #fbfcfd; }
+  .meta {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin: 0.15rem 0;
+  }
+  .meta strong { color: var(--fg); }
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--bg-soft);
+    padding: 0.7rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.9rem;
+  }
+  ul { padding-left: 1.3rem; }
+  a { color: var(--accent); word-break: break-word; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  .sources li { margin-bottom: 0.6rem; }
+</style>
+</head>
+<body>
+
+<h1>DDV Reporter — Tabbed Interface &amp; Help (Pomoč) Page Specification</h1>
+<p class="meta"><strong>Version:</strong> 1.1 (draft for implementation planning)</p>
+<p class="meta"><strong>Date:</strong> 2026-07-16</p>
+<p class="meta"><strong>Status:</strong> Confirmed — ready for implementation planning</p>
+<p class="meta"><strong>Scope:</strong> Product / requirements only. No technical, architectural, or implementation decisions.</p>
+<p class="meta"><strong>Builds on:</strong> Spec 0001 (VAT records KIR/KPR JSON export) and Spec 0002 (Persist general
+  (Glava) data) — the persistence feature described in the "Pomnenje" help article is defined in spec 0002.</p>
+
+<div class="callout">
+  <strong>Not a VAT rule.</strong> This feature is <em>navigation and static help/instructional content</em>
+  only. It introduces no new tax logic, no new FURS fields, no serialization or validation changes, and
+  changes nothing about how DDV is reported, calculated, or validated. Consequently there is no FURS /
+  ZDDV-1 dependency to research or cite for the behavior described here (see §9). All existing FURS field
+  definitions, validation rules, and the DDV_KIR_KPR output from specs 0001–0002 remain unchanged.
+</div>
+
+<h2>1. Summary</h2>
+<p>
+  Introduce a <strong>two-tab interface</strong> above the existing single-page content. The current
+  application content moves into a tab called <strong>"Poročilo"</strong>; a new tab called
+  <strong>"Pomoč"</strong> holds a plain-language help page. The page title (<code>&lt;h1&gt;</code>) stays
+  above the tabs. The selected tab is <strong>visibly indicated</strong>. The "Pomoč" tab opens with a
+  short, layman's-terms description of the app plus an open-source note linking to the repository, followed
+  by short titled help articles — for now exactly one, <strong>"Pomnenje"</strong>, explaining the Glava
+  data-persistence feature (spec 0002) in plain terms. As part of this change, the existing
+  <code>.app-intro</code> paragraph on the "Poročilo" tab is <strong>repurposed from a "what is this app"
+  description into brief instructional guidance on how to fill out the form</strong> (the "what is this
+  app" role now lives on "Pomoč"). Purely a UI/UX change; nothing leaves the browser.
+</p>
+
+<h2>2. Background / motivation</h2>
+<p>
+  The app has grown from a single data-entry form into something with its own behaviors (e.g. local
+  persistence, spec 0002) that benefit from explanation. Rather than crowding the working form with prose,
+  a dedicated <strong>"Pomoč"</strong> tab lets users read plain-language help <em>without leaving the
+  app</em> or losing in-progress work, and gives a stable home for future help articles. Tabs also keep the
+  primary working surface ("Poročilo") uncluttered. Moving the "what is this app" explanation to "Pomoč"
+  frees the "Poročilo" intro paragraph to do a more useful job right where the user works — telling them
+  <em>how</em> to fill out the form. The help page additionally surfaces the app's defining privacy
+  property — that entered data never leaves the browser — where a first-time user will actually read it.
+</p>
+
+<h2>3. Scope</h2>
+<h3>In scope</h3>
+<ul>
+  <li>A <strong>tab bar with exactly two tabs</strong>, labelled <strong>"Poročilo"</strong> and
+    <strong>"Pomoč"</strong>, rendered below the page <code>&lt;h1&gt;</code> (§4).</li>
+  <li>Moving <strong>all current page content except the <code>&lt;h1&gt;</code></strong> — the intro
+    paragraph, the three sections (Glava, KIR, KPR), and the download section — into the "Poročilo" tab
+    (§4, §5). Structural position and order are preserved; the sections and download flow are unchanged.</li>
+  <li><strong>Rewriting the <code>.app-intro</code> paragraph text</strong> on the "Poročilo" tab: its
+    structural position stays (first item under the tab), but its <em>text</em> changes from describing what
+    the app is to brief instructional guidance on how to fill out the form (§5.1, §6.1). New fixed Slovenian
+    copy is specified in §6.1.</li>
+  <li>A <strong>visible selected-tab indication</strong>, distinguishable by more than color alone, and
+    exposed to assistive technology (§4).</li>
+  <li>A <strong>"Pomoč" page</strong> containing: (a) a short layman's-terms description of the app, (b) an
+    open-source note with a link to the repository, and (c) short titled help articles (§5, §6).</li>
+  <li>Exactly <strong>one help article, "Pomnenje"</strong>, explaining the Glava persistence feature in
+    plain terms (§6.3).</li>
+  <li><strong>State-preserving tab switching:</strong> switching tabs must not lose entered data or reset
+    validation state (§4).</li>
+</ul>
+<h3>Out of scope</h3>
+<ul>
+  <li><strong>Deep-linking / URL persistence of the selected tab.</strong> No URL hash or query param; the
+    app always opens on "Poročilo" (§4). Bookmarking/sharing a specific tab is explicitly not supported.</li>
+  <li><strong>Any additional help articles</strong> beyond "Pomnenje" (the structure supports more later,
+    but none are specified now).</li>
+  <li>Any change to the <strong>data model, FURS fields, validation rules, serialization, or the
+    DDV_KIR_KPR output</strong> (specs 0001–0002 unchanged).</li>
+  <li>Any change to the <strong>persistence behavior</strong> itself — "Pomnenje" only <em>describes</em>
+    the spec-0002 feature; it does not alter it.</li>
+  <li>A search, table of contents, collapsible/accordion articles, or more than two tabs.</li>
+</ul>
+
+<h2>4. Layout &amp; navigation</h2>
+<ul>
+  <li>The page <strong><code>&lt;h1&gt;</code> "DDV Poročilo" stays above the tab bar</strong> and is shown
+    on both tabs (it is the app title, not tab content).</li>
+  <li>Directly below the <code>&lt;h1&gt;</code> sits a <strong>tab bar</strong> with two tabs in this
+    order: <strong>"Poročilo"</strong> (first) and <strong>"Pomoč"</strong> (second).</li>
+  <li><strong>Default tab on load is "Poročilo".</strong> Every page load / reload starts on "Poročilo"
+    (no memory of the previously viewed tab — consistent with the no-deep-linking decision).</li>
+  <li><strong>Exactly one tab's content is visible at a time.</strong> Selecting a tab shows its content
+    and hides the other's.</li>
+  <li><strong>Selected-tab indication (fixed requirement):</strong> the currently selected tab must be
+    <strong>visibly distinct</strong> from the unselected tab, and the distinction must <strong>not rely on
+    color alone</strong> (e.g. also weight, an underline/fill, or similar non-color cue), so it is
+    perceivable regardless of color vision. The selected state must also be <strong>conveyed to assistive
+    technology</strong> (a screen-reader user must be able to tell which tab is active and which are
+    available). Exact visual styling is left to implementation planning; it must reuse the app's existing
+    visual language and palette (<code>--accent</code>, <code>--border</code>, <code>--bg-soft</code>) and
+    introduce no bespoke component styling beyond what the tab bar requires.</li>
+  <li><strong>State-preserving switching (fixed requirement):</strong> switching from "Poročilo" to "Pomoč"
+    and back must <strong>preserve everything</strong> in "Poročilo" — entered Glava/KIR/KPR values, added
+    ledger rows, validation state (including whether errors are currently revealed), and the download
+    message. Switching tabs is a show/hide of already-mounted content, never a reset, re-render-from-blank,
+    or re-validation. (<em>Rationale:</em> the help tab is reference material a user may consult mid-entry;
+    consulting it must be cost-free.)</li>
+  <li><strong>Keyboard &amp; focus (product-level requirement):</strong> tabs must be reachable and
+    operable by keyboard, not mouse/pointer only. The precise key model is an implementation/accessibility
+    detail, but keyboard operability itself is required.</li>
+</ul>
+
+<h2>5. Tab contents</h2>
+<h3>5.1 "Poročilo" tab</h3>
+<p>
+  Contains <strong>today's page content in the same order and structural position</strong>: the intro
+  paragraph (<code>.app-intro</code>), the <strong>Glava</strong> section (general data + the "Zapomni si" /
+  "Pozabi" persist controls), the <strong>Izdani računi (KIR)</strong> section, the <strong>Prejeti računi
+  (KPR)</strong> section, and the <strong>download section</strong> (the "Prenesi JSON" button and its
+  message). The sections, fields, validation, and download flow are <strong>unchanged</strong> and simply
+  relocated under the tab.
+</p>
+<p>
+  <strong>One text change:</strong> the <code>.app-intro</code> paragraph's <em>copy is rewritten</em> (its
+  structural position is unchanged). Previously it described what the app is; that role moves to the "Pomoč"
+  description (§6.1). On "Poročilo" it becomes <strong>brief instructional guidance</strong> on how to fill
+  out the form — see the fixed Slovenian copy in §6.1. No other wording, field, behavior, or validation in
+  this content changes.
+</p>
+<h3>5.2 "Pomoč" tab</h3>
+<p>The "Pomoč" tab, in order:</p>
+<ol>
+  <li>A short <strong>layman's-terms description</strong> of what the app is and does (§6.1).</li>
+  <li>An <strong>open-source note</strong> with a link to the repository (§6.2).</li>
+  <li>A series of <strong>short, titled help articles</strong>; for now exactly one — <strong>"Pomnenje"</strong>
+    (§6.3). Each article has a heading and a short body. The layout must accommodate more articles later
+    without redesign, but none beyond "Pomnenje" are specified here.</li>
+</ol>
+
+<h2>6. User-facing text (Slovenian)</h2>
+<p>
+  All user-facing text is <strong>Slovenian</strong>, per project convention (CLAUDE.md) and specs 0001–0002.
+  The exact strings below are the confirmed copy; tone is plain, non-technical, and addresses the user
+  directly (as elsewhere in the app).
+</p>
+
+<h3>6.1 Tab labels, the "Poročilo" instructional intro &amp; the "Pomoč" app description</h3>
+<p>
+  Note the two distinct paragraphs: the <strong>"Poročilo" intro (<code>.app-intro</code>) is
+  instructional</strong> ("how do I fill this out"), while the <strong>"Pomoč" description is
+  explanatory</strong> ("what is this app"). They are intentionally different and must not be duplicates.
+</p>
+<table>
+  <thead>
+    <tr><th>Element</th><th>Text (Slovenian) — fixed</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Tab 1 label</td><td><strong>Poročilo</strong></td></tr>
+    <tr><td>Tab 2 label</td><td><strong>Pomoč</strong></td></tr>
+    <tr>
+      <td>"Poročilo" intro (<code>.app-intro</code>)<br>— instructional, rewritten</td>
+      <td>Najprej v razdelku Glava vnesite davčno številko in izberite obdobje poročanja. Nato v razdelku
+        Izdani računi (KIR) z gumbom »Dodaj izdani račun« dodajte izdane račune, v razdelku Prejeti računi
+        (KPR) pa z gumbom »Dodaj prejeti račun« prejete račune. Ko so podatki vneseni, jih z gumbom »Prenesi
+        JSON« izvozite v datoteko za oddajo na FURS.</td>
+    </tr>
+    <tr>
+      <td>App description blurb<br>(top of "Pomoč") — explanatory</td>
+      <td>DDV Poročilo je brezplačno spletno orodje, ki slovenskim zavezancem za DDV pomaga pripraviti
+        evidenco obračunanega DDV (izdani računi – KIR) in evidenco odbitka DDV (prejeti računi – KPR) ter
+        ju izvoziti v datoteko JSON v obliki, ki jo sprejme FURS. Vse poteka v vašem brskalniku – vneseni
+        podatki nikoli ne zapustijo vaše naprave.</td>
+    </tr>
+  </tbody>
+</table>
+<p>
+  The instructional intro's steps mirror the actual UI flow and control labels verified against the current
+  form: Glava (davčna številka + obdobje poročanja) → "Dodaj izdani račun" (KIR) → "Dodaj prejeti račun"
+  (KPR) → "Prenesi JSON" (download). If any of those on-screen labels change in future, this copy should be
+  kept in sync.
+</p>
+
+<h3>6.2 Open-source note &amp; repository link</h3>
+<ul>
+  <li><strong>Copy (Slovenian):</strong> "Aplikacija je odprtokodni projekt. Izvorno kodo najdete na
+    GitHubu."</li>
+  <li><strong>Link text (Slovenian):</strong> "GitHub" (the linked words within the sentence).</li>
+  <li><strong>Link URL:</strong> <code>https://github.com/zanvd/ddv-reporter</code></li>
+  <li><strong>Link target:</strong> opens in a <strong>new tab / window</strong>, so the user does not lose
+    in-progress form work. (Follow the app's usual safe practice for externally-targeted links; the
+    specific attributes are an implementation detail.)</li>
+</ul>
+
+<h3>6.3 Help article "Pomnenje"</h3>
+<p><strong>Article heading (Slovenian) — fixed:</strong> "Pomnenje"</p>
+<p><strong>Article body (Slovenian) — fixed copy:</strong></p>
+<pre>V razdelku Glava lahko svoje splošne podatke (davčno številko, izbrano obdobje poročanja in obe potrditveni polji) shranite, da jih ob naslednjem obisku ni potrebno znova vnašati.
+
+S klikom na gumb »Zapomni si« aplikacija shrani trenutne podatke razdelka Glava. Ob naslednjem odprtju aplikacije v istem brskalniku se ti podatki samodejno izpolnijo. Ob ponovnem kliku na gumb se shranjeni podatki posodobijo s trenutnimi. S klikom na »Pozabi« shranjeno kopijo izbrišete.
+
+Aplikacija si zapomni le podatke razdelka Glava; vnesenih računov (KIR in KPR) ne shrani.
+
+Vaši podatki ostanejo izključno v vašem brskalniku in nikoli ne zapustijo vaše naprave. Prav tako se ne prenašajo ali usklajujejo med različnimi brskalniki, napravami ali profili. Shranjena kopija je na voljo samo v istem brskalniku na isti napravi.
+
+Shranjena kopija se lahko izgubi, če počistite podatke brskalnika, v zasebnem oz. anonimnem (incognito) načinu pa se shranjevanje morda ne bo obdržalo.</pre>
+<p>
+  Content notes (why the copy says what it says): it names the real controls <strong>"Zapomni si"</strong>
+  (save) and <strong>"Pozabi"</strong> (forget); states that restore is <strong>automatic on the next
+  visit but only in the same browser</strong> (no cross-browser/device sync); scopes persistence to the
+  <strong>Glava section only</strong> (invoices are never saved); stresses the privacy property that
+  <strong>data never leaves the browser</strong>; and closes with the two edge-case caveats
+  (<strong>cleared browser data</strong> and <strong>private/incognito mode</strong>) in a single sentence.
+  The stale-value validation nuance from spec 0002 §6.4 is deliberately <strong>omitted</strong> as too
+  detailed for a layman article.
+</p>
+
+<h2>7. Edge cases</h2>
+<table>
+  <thead>
+    <tr><th>Case</th><th>Expected handling</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Narrow / mobile viewport — the two-tab bar in a small width</td>
+      <td>The tab bar must remain usable and readable at small widths (e.g. wrap or shrink gracefully);
+        both tabs stay reachable. Exact responsive treatment is left to implementation, but the tabs must
+        not overflow off-screen or become unreachable.</td>
+    </tr>
+    <tr>
+      <td>Long help content taller than the viewport</td>
+      <td>The "Pomoč" content scrolls normally within the page; the <code>&lt;h1&gt;</code> and tab bar
+        behave as ordinary page content (no special sticky behavior required).</td>
+    </tr>
+    <tr>
+      <td>Validation errors present in "Poročilo" while the user is on "Pomoč"</td>
+      <td>Switching to "Pomoč" hides but does not clear or resolve them; switching back shows the exact
+        prior validation state (§4, state-preserving switching).</td>
+    </tr>
+    <tr>
+      <td>Reload while on "Pomoč"</td>
+      <td>App reopens on "Poročilo" (no tab-state persistence, §4). Not a bug — the confirmed behavior.</td>
+    </tr>
+    <tr>
+      <td>Repository link unreachable / offline</td>
+      <td>Out of the app's control; the link is a normal external link. No special handling required.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>8. Non-goals (explicitly deferred)</h2>
+<ul>
+  <li><strong>Deep-linking</strong> or any URL/hash reflection of the selected tab.</li>
+  <li><strong>Additional help articles</strong> beyond "Pomnenje".</li>
+  <li>A help <strong>search, table of contents, or accordion/collapse</strong> interaction.</li>
+  <li><strong>More than two tabs.</strong></li>
+  <li>Any change to persistence behavior, FURS fields, validation, serialization, or the DDV_KIR_KPR
+    output.</li>
+</ul>
+
+<h2>9. References / notes</h2>
+<p>
+  This feature is <strong>navigation and static help/instructional content</strong> only. It has no
+  dependency on any FURS form, the ZDDV-1 / ZDDV-1O statute, the Pravilnik o izvajanju ZDDV-1, or any EU VAT
+  rule, and it does not change the DDV_KIR_KPR file, its fields, or its validation. Accordingly, <strong>no
+  external legal or regulatory sources apply to the behavior specified here</strong>, and none are cited — a
+  deliberate note, not an omission. The only relevant references are internal:
+</p>
+<ul>
+  <li><strong>Spec 0001 — VAT records KIR/KPR JSON export</strong>
+    (<code>specs/0001-vat_records_kir_kpr_json_export.html</code>): defines the sections, fields, and
+    validation model that the "Poročilo" tab now hosts unchanged.</li>
+  <li><strong>Spec 0002 — Persist general (Glava) data</strong>
+    (<code>specs/0002-persist_general_data.html</code>): defines the persistence feature — the "Zapomni
+    si" / "Pozabi" controls, auto-restore, Glava-only scope, and local-only privacy property — that the
+    "Pomnenje" help article (§6.3) describes in layman's terms.</li>
+  <li><strong>Project conventions</strong> (repo-root <code>CLAUDE.md</code>): all user-facing text is
+    Slovenian; nothing leaves the browser; KISS/YAGNI (no speculative structure — e.g. only the one
+    "Pomnenje" article, though the layout must accommodate more later).</li>
+</ul>
+
+<h2>10. Open questions</h2>
+<p>None. All product decisions (no deep-linking, repo link opens in a new tab, intro paragraph and download
+  section both live under "Poročilo", state preserved across tab switches, real button names referenced in
+  the article, the two edge-case caveats included, and the repurposing of <code>.app-intro</code> into
+  instructional guidance) are confirmed.</p>
+
+</body>
+</html>

@@ -9,30 +9,71 @@
 <body>
 <main>
   <h1>DDV Poročilo</h1>
-  <p class="app-intro">
-    Vnesite podatke evidence obračunanega DDV (izdani računi) in evidence odbitka DDV
-    (prejeti računi) ter jih izvozite v datoteko JSON za oddajo na FURS.
-  </p>
 
-  <section id="general-section" aria-labelledby="general-heading">
-    <h2 id="general-heading">Glava</h2>
-    <div id="general-content"><!-- Rendered by js/view/general.js --></div>
-    <div id="general-persist"><!-- Rendered by js/view/persistControls.js --></div>
-  </section>
+  <div class="tabs" role="tablist" aria-label="Zavihki">
+    <button class="tab" role="tab" id="tab-porocilo"
+            aria-controls="panel-porocilo" aria-selected="true" tabindex="0">Poročilo</button>
+    <button class="tab" role="tab" id="tab-pomoc"
+            aria-controls="panel-pomoc" aria-selected="false" tabindex="-1">Pomoč</button>
+  </div>
 
-  <section id="kir-section" aria-labelledby="kir-heading">
-    <h2 id="kir-heading">Izdani računi (KIR)</h2>
-    <div id="kir-content"><!-- Rendered by js/view/kirList.js --></div>
-  </section>
+  <div id="panel-porocilo" class="tabpanel" role="tabpanel" aria-labelledby="tab-porocilo" tabindex="0">
+    <p class="app-intro">
+      Najprej v razdelku Glava vnesite davčno številko in izberite obdobje poročanja. Nato v razdelku
+      Izdani računi (KIR) z gumbom »Dodaj izdani račun« dodajte izdane račune, v razdelku Prejeti računi
+      (KPR) pa z gumbom »Dodaj prejeti račun« prejete račune. Ko so podatki vneseni, jih z gumbom »Prenesi
+      JSON« izvozite v datoteko za oddajo na FURS.
+    </p>
 
-  <section id="kpr-section" aria-labelledby="kpr-heading">
-    <h2 id="kpr-heading">Prejeti računi (KPR)</h2>
-    <div id="kpr-content"><!-- Rendered by js/view/kprList.js --></div>
-  </section>
+    <section id="general-section" aria-labelledby="general-heading">
+      <h2 id="general-heading">Glava</h2>
+      <div id="general-content"><!-- Rendered by js/view/general.js --></div>
+      <div id="general-persist"><!-- Rendered by js/view/persistControls.js --></div>
+    </section>
 
-  <div id="download-section">
-    <button type="button" id="download-button" class="download-button">Prenesi JSON</button>
-    <p id="download-message" class="field-error" role="alert"></p>
+    <section id="kir-section" aria-labelledby="kir-heading">
+      <h2 id="kir-heading">Izdani računi (KIR)</h2>
+      <div id="kir-content"><!-- Rendered by js/view/kirList.js --></div>
+    </section>
+
+    <section id="kpr-section" aria-labelledby="kpr-heading">
+      <h2 id="kpr-heading">Prejeti računi (KPR)</h2>
+      <div id="kpr-content"><!-- Rendered by js/view/kprList.js --></div>
+    </section>
+
+    <div id="download-section">
+      <button type="button" id="download-button" class="download-button">Prenesi JSON</button>
+      <p id="download-message" class="field-error" role="alert"></p>
+    </div>
+  </div>
+
+  <div id="panel-pomoc" class="tabpanel" role="tabpanel" aria-labelledby="tab-pomoc" tabindex="0" hidden>
+    <p class="help-lede">
+      DDV Poročilo je brezplačno spletno orodje, ki slovenskim zavezancem za DDV pomaga pripraviti
+      evidenco obračunanega DDV (izdani računi – KIR) in evidenco odbitka DDV (prejeti računi – KPR) ter
+      ju izvoziti v datoteko JSON v obliki, ki jo sprejme FURS. Vse poteka v vašem brskalniku – vneseni
+      podatki nikoli ne zapustijo vaše naprave.
+    </p>
+
+    <div class="oss-note">
+      <span>Aplikacija je odprtokodni projekt. Izvorno kodo najdete na
+        <a href="https://github.com/zanvd/ddv-reporter" target="_blank" rel="noopener noreferrer">GitHubu</a>.</span>
+    </div>
+
+    <article class="help-article">
+      <h2>Pomnenje</h2>
+      <p>V razdelku Glava lahko svoje splošne podatke (davčno številko, izbrano obdobje poročanja in obe
+        potrditveni polji) shranite, da jih ob naslednjem obisku ni potrebno znova vnašati.</p>
+      <p>S klikom na gumb »Zapomni si« aplikacija shrani trenutne podatke razdelka Glava. Ob naslednjem
+        odprtju aplikacije v istem brskalniku se ti podatki samodejno izpolnijo. Ob ponovnem kliku na gumb
+        se shranjeni podatki posodobijo s trenutnimi. S klikom na »Pozabi« shranjeno kopijo izbrišete.</p>
+      <p>Aplikacija si zapomni le podatke razdelka Glava; vnesenih računov (KIR in KPR) ne shrani.</p>
+      <p>Vaši podatki ostanejo izključno v vašem brskalniku in nikoli ne zapustijo vaše naprave. Prav tako
+        se ne prenašajo ali usklajujejo med različnimi brskalniki, napravami ali profili. Shranjena kopija
+        je na voljo samo v istem brskalniku na isti napravi.</p>
+      <p>Shranjena kopija se lahko izgubi, če počistite podatke brskalnika, v zasebnem oz. anonimnem
+        (incognito) načinu pa se shranjevanje morda ne bo obdržalo.</p>
+    </article>
   </div>
 </main>
 <script type="module" src="js/main.js"></script>

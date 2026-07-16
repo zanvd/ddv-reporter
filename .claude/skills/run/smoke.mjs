@@ -95,6 +95,9 @@ async function main() {
       el.dispatchEvent(new Event('change',{bubbles:true})); return el.value;})()`);
   const click = (sel) =>
     evalJs(`(()=>{const el=document.querySelector('${sel}'); if(!el) return 'NO_EL:${sel}'; el.click(); return 'clicked';})()`);
+  const pressArrow = (key) =>
+    evalJs(`(()=>{document.querySelector('[role="tablist"]').dispatchEvent(
+      new KeyboardEvent('keydown', { key: '${key}', bubbles: true, cancelable: true })); return true;})()`);
 
   const results = [];
   const check = (name, cond, detail = '') => {
@@ -107,10 +110,55 @@ async function main() {
   await waitFor(`!!document.querySelector('#general-content input')`, 'general form rendered');
   await shot('01-initial');
   check('h1 = "DDV Poročilo"', (await evalJs(`document.querySelector('h1').textContent`)) === 'DDV Poročilo');
-  check('three section headings', (await evalJs(`document.querySelectorAll('h2').length`)) === 3);
+  check('three section headings in Poročilo panel',
+    (await evalJs(`document.querySelectorAll('#panel-porocilo h2').length`)) === 3);
   check('no errors on load (quiet-until-touched)', (await errorsIn('#general-content')).length === 0);
   check('both lists show empty state',
     (await evalJs(`!!document.querySelector('#kir-content .empty-state') && !!document.querySelector('#kpr-content .empty-state')`)));
+
+  // 1b. Tab bar — default state on load
+  check('tab-porocilo selected by default',
+    (await evalJs(`document.getElementById('tab-porocilo').getAttribute('aria-selected')`)) === 'true');
+  check('tab-pomoc not selected by default',
+    (await evalJs(`document.getElementById('tab-pomoc').getAttribute('aria-selected')`)) === 'false');
+  check('panel-porocilo visible by default', await evalJs(`!document.getElementById('panel-porocilo').hidden`));
+  check('panel-pomoc hidden by default', await evalJs(`document.getElementById('panel-pomoc').hidden`));
+
+  // 1c. Switching to Pomoč: shows help content, hides the form, flips aria-selected
+  await setInput('#tax-payer-id', '99999999');
+  await click('#tab-pomoc');
+  await sleep(150);
+  check('clicking Pomoč shows the help panel', await evalJs(`!document.getElementById('panel-pomoc').hidden`));
+  check('clicking Pomoč hides the Poročilo panel', await evalJs(`document.getElementById('panel-porocilo').hidden`));
+  check('tab-pomoc aria-selected flips to true',
+    (await evalJs(`document.getElementById('tab-pomoc').getAttribute('aria-selected')`)) === 'true');
+  check('tab-porocilo aria-selected flips to false',
+    (await evalJs(`document.getElementById('tab-porocilo').getAttribute('aria-selected')`)) === 'false');
+  check('Pomoč shows the GitHub oss-note link',
+    await evalJs(`!!document.querySelector('.oss-note a[href="https://github.com/zanvd/ddv-reporter"]')`));
+  check('Pomoč shows the "Pomnenje" article',
+    (await evalJs(`document.querySelector('.help-article h2')?.textContent`)) === 'Pomnenje');
+  await shot('01b-pomoc-tab');
+
+  // 1d. State preservation: switching back to Poročilo keeps the entered value
+  await click('#tab-porocilo');
+  await sleep(150);
+  check('switching back shows the Poročilo panel', await evalJs(`!document.getElementById('panel-porocilo').hidden`));
+  check('entered value survives the round-trip to Pomoč and back',
+    (await evalJs(`document.getElementById('tax-payer-id').value`)) === '99999999');
+  // Reset before the Download-gate checks below, which expect a blank general section.
+  await setInput('#tax-payer-id', '');
+
+  // 1e. Keyboard operability — ArrowRight/ArrowLeft move tab selection
+  await pressArrow('ArrowRight');
+  await sleep(150);
+  check('ArrowRight moves focus to tab-pomoc', (await evalJs(`document.activeElement.id`)) === 'tab-pomoc');
+  check('ArrowRight shows the Pomoč panel', await evalJs(`!document.getElementById('panel-pomoc').hidden`));
+
+  await pressArrow('ArrowLeft');
+  await sleep(150);
+  check('ArrowLeft moves focus back to tab-porocilo', (await evalJs(`document.activeElement.id`)) === 'tab-porocilo');
+  check('ArrowLeft shows the Poročilo panel', await evalJs(`!document.getElementById('panel-porocilo').hidden`));
 
   // 2. Empty-form Download -> gate blocks + reveals errors
   await click('#download-button');

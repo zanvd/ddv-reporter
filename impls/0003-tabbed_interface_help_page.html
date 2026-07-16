@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DDV Reporter — Tabbed Interface &amp; Pomoč Help Page Implementation Plan</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --muted: #5a5a5a;
+    --accent: #0b5c8a;
+    --border: #d5d9dd;
+    --bg-soft: #f6f8fa;
+    --code-bg: #eef1f4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    line-height: 1.55;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 5rem;
+  }
+  h1 { font-size: 1.8rem; line-height: 1.2; margin: 0 0 0.4rem; }
+  h2 {
+    font-size: 1.25rem;
+    margin: 2.4rem 0 0.8rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 2px solid var(--border);
+  }
+  h3 { font-size: 1.05rem; margin: 1.6rem 0 0.6rem; color: var(--accent); }
+  p, li { font-size: 0.95rem; }
+  code {
+    background: var(--code-bg);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85em;
+  }
+  pre {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.65rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--bg-soft); font-weight: 600; }
+  tr:nth-child(even) td { background: #fbfcfd; }
+  .meta {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin: 0.15rem 0;
+  }
+  .meta strong { color: var(--fg); }
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--bg-soft);
+    padding: 0.7rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.9rem;
+  }
+  .decision {
+    border-left: 4px solid #2e7d32;
+    background: #f2faf3;
+    padding: 0.6rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.88rem;
+  }
+  .flag {
+    border-left: 4px solid #b8860b;
+    background: #fdf9ef;
+    padding: 0.6rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.88rem;
+  }
+  ul { padding-left: 1.3rem; }
+  a { color: var(--accent); word-break: break-word; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+
+<h1>DDV Reporter — Tabbed Interface &amp; Pomoč Help Page Implementation Plan</h1>
+<p class="meta"><strong>Plan version:</strong> 1.0</p>
+<p class="meta"><strong>Date:</strong> 2026-07-16</p>
+<p class="meta"><strong>Implements spec:</strong> <code>specs/0003-tabbed_interface_help_page.html</code> (v1.1, confirmed)</p>
+<p class="meta"><strong>Builds on plans:</strong> <code>impls/0001-vat_records_kir_kpr_json_export.html</code> and
+  <code>impls/0002-persist_general_data.html</code> (the module set this feature wraps, unchanged)</p>
+<p class="meta"><strong>Status:</strong> Approved — ready to build</p>
+<p class="meta"><strong>Scope:</strong> Technical/architecture only. The spec is the binding source of requirements; this plan
+  describes <em>how</em> to build exactly what it specifies.</p>
+
+<div class="callout">
+  <strong>Not a VAT rule, no logic change.</strong> This is a navigation + static help/instructional
+  UI change only. It touches <strong>no</strong> pure logic module (<code>derive</code> /
+  <code>validate</code> / <code>serialize</code> / <code>state</code> / <code>countries</code> /
+  <code>generalStore</code> / <code>storage</code> / <code>download</code>), no data model, no FURS
+  field, no validation rule, and produces the identical <code>DDV_KIR_KPR</code> output as specs
+  0001&ndash;0002. Nothing new leaves the browser.
+</div>
+
+<div class="decision">
+  <strong>Settled decisions (confirmed with the user):</strong>
+  <ol style="margin:0.3rem 0 0;">
+    <li><strong>Pomoč content is static HTML in <code>index.html</code></strong> — fixed copy, no state, no
+      JS render. Matches how <code>.app-intro</code> and the <code>&lt;h2&gt;</code> headings already live
+      statically. No <code>view/pomoc.js</code>.</li>
+    <li><strong>Tab logic is a new <code>view/tabs.js</code></strong> (DOM-only), wired from
+      <code>main.js</code>. Keeps <code>main.js</code> wiring-only and DOM code inside <code>view/</code>.</li>
+    <li><strong>No new CSS token.</strong> <code>.oss-note</code> reuses <code>--bg-soft</code>; the mockup's
+      <code>--accent-soft</code> is <strong>not</strong> introduced (spec §4: reuse
+      <code>--accent</code>/<code>--border</code>/<code>--bg-soft</code>, no bespoke component styling).</li>
+    <li><strong>Dark theme is out of scope.</strong> The mockup's dark-theme tokens are not ported;
+      production <code>styles.css</code> has none and the spec does not mention it.</li>
+    <li><strong>The "Pomnenje" article heading is an <code>&lt;h2&gt;</code></strong> (not the mockup's
+      <code>&lt;h3&gt;</code>), styled lighter than section <code>&lt;h2&gt;</code>s, for a correct
+      <code>h1&nbsp;&rarr;&nbsp;h2</code> outline.</li>
+  </ol>
+</div>
+
+<h2>1. Overview</h2>
+<p>
+  Wrap the existing single-page app in a two-tab ARIA tab pattern. The page <code>&lt;h1&gt;</code> stays
+  above the tab bar. Tab <strong>"Poročilo"</strong> holds all of today's content (rewritten
+  <code>.app-intro</code>, plus the unchanged Glava/KIR/KPR sections and download section); tab
+  <strong>"Pomoč"</strong> holds static help — an app description, an open-source note linking to the
+  repository, and one titled help article, <strong>"Pomnenje"</strong>. Switching tabs is a pure
+  show/hide of already-mounted DOM: the Poročilo form is <strong>never</strong> re-mounted, re-rendered,
+  or re-validated, so every bit of in-progress state survives (spec §4). The only interactive code added
+  is a small tab controller (click + arrow-key activation, roving <code>tabindex</code>, panel toggling).
+  Everything else is static markup and CSS. Guiding principles: KISS/YAGNI — static copy stays static;
+  no new abstraction, no persistence, no URL state.
+</p>
+
+<h2>2. Files touched</h2>
+<table>
+  <thead>
+    <tr><th>File</th><th>New?</th><th>Change</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>src/index.html</code></td>
+      <td>edit</td>
+      <td>Insert the tab bar (<code>role="tablist"</code>) directly below <code>&lt;h1&gt;</code>; wrap the
+        existing content in <code>#panel-porocilo</code> (<code>role="tabpanel"</code>); rewrite the
+        <code>.app-intro</code> copy (§6.1); add the static <code>#panel-pomoc</code> panel
+        (<code>role="tabpanel"</code>, <code>hidden</code>) with the blurb, oss-note, and "Pomnenje"
+        article.</td>
+    </tr>
+    <tr>
+      <td><code>src/js/view/tabs.js</code></td>
+      <td><strong>new</strong></td>
+      <td>Exports <code>initTabs(tablistEl)</code> — wires click + <code>ArrowLeft</code>/<code>ArrowRight</code>
+        activation, roving <code>tabindex</code>, and toggles each panel's <code>hidden</code> +
+        <code>aria-selected</code>. DOM-only, lives in <code>view/</code> per the architecture rule.</td>
+    </tr>
+    <tr>
+      <td><code>src/js/main.js</code></td>
+      <td>edit</td>
+      <td>Add the <code>tabs.js</code> import and a single call:
+        <code>initTabs(document.querySelector('[role="tablist"]'))</code> after the views mount. No other
+        change — the existing one-time mounting already lands inside the Poročilo panel.</td>
+    </tr>
+    <tr>
+      <td><code>src/css/styles.css</code></td>
+      <td>edit</td>
+      <td>Add <code>.tabs</code>, <code>.tab</code> (+ <code>:hover</code> / <code>[aria-selected="true"]</code>
+        / <code>:focus-visible</code>), <code>.tabpanel[hidden]</code>, and the Pomoč helpers
+        <code>.help-lede</code>, <code>.oss-note</code>, <code>.help-article</code> (incl. the lighter
+        <code>.help-article h2</code>). Reuses existing tokens only.</td>
+    </tr>
+    <tr>
+      <td><code>.claude/skills/run/smoke.mjs</code></td>
+      <td>edit</td>
+      <td>Extend the headless-Chrome smoke test to cover tab default, switching, keyboard nav, and
+        state preservation (see §7).</td>
+    </tr>
+  </tbody>
+</table>
+<p>
+  <strong>Explicitly unchanged:</strong> all pure logic modules, <code>view/general.js</code>,
+  <code>view/persistControls.js</code>, <code>view/entryList.js</code>,
+  <code>view/fieldBuilders.js</code>, <code>view/kirList.js</code>, <code>view/kprList.js</code>,
+  <code>view/touch.js</code>, and every existing <code>*.test.js</code>.
+</p>
+
+<h2>3. DOM &amp; ARIA structure (index.html)</h2>
+<p>
+  Standard WAI-ARIA APG tabs pattern with native <code>&lt;button&gt;</code> tabs (Enter/Space activation
+  for free). The <code>&lt;h1&gt;</code> is a sibling <em>above</em> the tablist, so it shows on both tabs
+  (it is the app title, not tab content — spec §4).
+</p>
+<pre>&lt;main&gt;
+  &lt;h1&gt;DDV Poročilo&lt;/h1&gt;                              &larr; stays above tabs, shown on both
+
+  &lt;div class="tabs" role="tablist" aria-label="Zavihki"&gt;
+    &lt;button class="tab" role="tab" id="tab-porocilo"
+            aria-controls="panel-porocilo" aria-selected="true"  tabindex="0"&gt;Poročilo&lt;/button&gt;
+    &lt;button class="tab" role="tab" id="tab-pomoc"
+            aria-controls="panel-pomoc"    aria-selected="false" tabindex="-1"&gt;Pomoč&lt;/button&gt;
+  &lt;/div&gt;
+
+  &lt;div id="panel-porocilo" class="tabpanel" role="tabpanel"
+       aria-labelledby="tab-porocilo" tabindex="0"&gt;
+    &lt;p class="app-intro"&gt; …rewritten instructional copy (§6.1)… &lt;/p&gt;
+    &lt;section id="general-section"&gt;…&lt;/section&gt;      &larr; unchanged, relocated (incl. #general-persist)
+    &lt;section id="kir-section"&gt;…&lt;/section&gt;
+    &lt;section id="kpr-section"&gt;…&lt;/section&gt;
+    &lt;div id="download-section"&gt;…&lt;/div&gt;
+  &lt;/div&gt;
+
+  &lt;div id="panel-pomoc" class="tabpanel" role="tabpanel"
+       aria-labelledby="tab-pomoc" tabindex="0" hidden&gt;
+    &lt;p class="help-lede"&gt; …app-description blurb (§6.1)… &lt;/p&gt;
+    &lt;div class="oss-note"&gt;&lt;span&gt;Aplikacija je odprtokodni projekt. Izvorno kodo najdete na
+        &lt;a href="https://github.com/zanvd/ddv-reporter"
+           target="_blank" rel="noopener noreferrer"&gt;GitHubu&lt;/a&gt;.&lt;/span&gt;&lt;/div&gt;
+    &lt;article class="help-article"&gt;
+      &lt;h2&gt;Pomnenje&lt;/h2&gt;
+      &lt;p&gt;…&lt;/p&gt;  &times;5   &larr; §6.3 body split into its 5 spec paragraphs
+    &lt;/article&gt;
+  &lt;/div&gt;
+&lt;/main&gt;
+&lt;script type="module" src="js/main.js"&gt;&lt;/script&gt;   &larr; unchanged</pre>
+<p>
+  Notes: (a) the existing inner content <code>&lt;div&gt;</code>s
+  (<code>#general-content</code>, <code>#general-persist</code>, <code>#kir-content</code>,
+  <code>#kpr-content</code>) and their IDs stay exactly as they are, so
+  <code>main.js</code>'s <code>getElementById</code> lookups keep working unchanged; they simply now sit
+  inside <code>#panel-porocilo</code>. (b) All Slovenian copy is taken <strong>verbatim</strong> from spec
+  §6.1/§6.2/§6.3 — nothing is invented or paraphrased. (c) The "Pomnenje" body's five spec paragraphs each
+  become a separate <code>&lt;p&gt;</code>.
+</p>
+
+<div class="flag">
+  <strong>Copy-fidelity flag (verbatim strings).</strong> Three blocks are fixed copy that must be
+  pasted character-for-character from the spec, including the Slovenian guillemets <code>»…«</code> and
+  the en-dash <code>&ndash;</code>: the rewritten <code>.app-intro</code> (§6.1), the oss-note sentence
+  (§6.2), and the five "Pomnenje" paragraphs (§6.3). The implementer should copy from the spec source, not
+  retype. The intro and the Pomoč blurb are intentionally <em>different</em> paragraphs (instructional vs.
+  explanatory) and must not be collapsed into one.
+</div>
+
+<h2>4. tabs.js — behavior</h2>
+<p>
+  Faithful to the approved mockup's controller. Pure DOM; no state module, no storage, no URL.
+</p>
+<ul>
+  <li><strong>Signature:</strong> <code>initTabs(tablistEl)</code>. Collects
+    <code>tablistEl.querySelectorAll('[role="tab"]')</code>; each tab's target panel is
+    <code>document.getElementById(tab.getAttribute('aria-controls'))</code>.</li>
+  <li><strong><code>selectTab(tab)</code>:</strong> for every tab, set <code>aria-selected</code>
+    <code>"true"/"false"</code>, roving <code>tabIndex</code> <code>0/-1</code>, and its panel's
+    <code>hidden</code> to <code>!selected</code>; then <code>tab.focus()</code>.</li>
+  <li><strong>Events:</strong> <code>click</code> &rarr; <code>selectTab</code>;
+    <code>keydown</code> <code>ArrowRight</code>/<code>ArrowLeft</code> &rarr; <code>preventDefault</code> +
+    select the next/previous tab with wrap-around. Native <code>&lt;button&gt;</code> supplies Enter/Space
+    activation, satisfying the keyboard-operability requirement (§4) without extra handlers.</li>
+  <li><strong>No deep-linking:</strong> writes no hash/query and reads none; the initial selected tab is
+    whatever the static markup declares (<code>Poročilo</code>). Every load/reload starts on Poročilo
+    (spec §4, out-of-scope §8).</li>
+</ul>
+
+<h2>5. State preservation — guaranteed structurally</h2>
+<p>
+  The core requirement (spec §4, edge case §7) is met <em>by construction</em>, not by added code.
+  <code>main.js</code> still calls <code>renderGeneral</code>, <code>renderKirList</code>,
+  <code>renderKprList</code>, and <code>renderPersistControls</code> exactly once at boot, into the same
+  containers — which now merely live inside <code>#panel-porocilo</code>. Auto-restore of the saved Glava
+  record and the restored-fields <code>revealErrors()</code> call (spec 0002) run once at boot, before any
+  tab interaction, and are untouched. Tab switching only flips the <code>hidden</code> attribute; there is
+  <strong>no code path</strong> that re-mounts, re-renders, or re-validates the form on tab change.
+  Therefore entered Glava/KIR/KPR values, added ledger rows, the revealed-vs-quiet error state, and the
+  download message all survive a round-trip to "Pomoč" and back with zero extra work.
+</p>
+<div class="callout">
+  <strong>Why <code>hidden</code> (not <code>display:none</code> in JS or DOM removal).</strong> Toggling
+  the native <code>hidden</code> attribute keeps the inactive panel's DOM and all listeners alive
+  (state-preserving) and removes it from the accessibility tree and tab order (so hidden-panel controls
+  aren't focusable). A single CSS rule <code>.tabpanel[hidden]{display:none}</code> backs it up for older
+  UA safety.
+</div>
+
+<h2>6. CSS additions</h2>
+<p>All rules reuse existing tokens; no new token, no dark theme, no bespoke palette.</p>
+<table>
+  <thead>
+    <tr><th>Selector</th><th>Purpose / key declarations</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>.tabs</code></td>
+      <td><code>display:flex; flex-wrap:wrap; gap:0.25rem; border-bottom:1px solid var(--border);
+        margin-bottom:1.5rem;</code> — <code>flex-wrap</code> keeps both tabs reachable on narrow
+        viewports (edge case §7).</td>
+    </tr>
+    <tr>
+      <td><code>.tab</code></td>
+      <td>Unstyled button base: <code>font:inherit; color:var(--muted); background:none; border:none;
+        border-bottom:3px solid transparent; padding; margin-bottom:-1px; cursor:pointer;</code> plus a
+        color/border transition.</td>
+    </tr>
+    <tr>
+      <td><code>.tab:hover</code></td>
+      <td><code>color:var(--fg);</code></td>
+    </tr>
+    <tr>
+      <td><code>.tab[aria-selected="true"]</code></td>
+      <td><strong>Non-color-alone selected cue (spec §4):</strong> <code>color:var(--accent)</code>
+        <em>plus</em> <code>font-weight:700</code> <em>plus</em>
+        <code>border-bottom-color:var(--accent)</code> (underline). Perceivable without color; the
+        <code>aria-selected</code> attribute conveys it to assistive tech.</td>
+    </tr>
+    <tr>
+      <td><code>.tab:focus-visible</code></td>
+      <td><code>outline:2px solid var(--accent); outline-offset:2px;</code> — visible keyboard focus.</td>
+    </tr>
+    <tr>
+      <td><code>.tabpanel[hidden]</code></td>
+      <td><code>display:none;</code> (belt-and-suspenders behind the native attribute).</td>
+    </tr>
+    <tr>
+      <td><code>.help-lede</code></td>
+      <td>The app-description blurb: modest size, bottom margin.</td>
+    </tr>
+    <tr>
+      <td><code>.oss-note</code></td>
+      <td><code>background:var(--bg-soft); border:1px solid var(--border); border-radius:6px; padding;</code>
+        — reuses <code>--bg-soft</code> (no <code>--accent-soft</code>). Link keeps default <code>a</code>
+        styling.</td>
+    </tr>
+    <tr>
+      <td><code>.help-article</code> / <code>.help-article + .help-article</code></td>
+      <td>Article spacing; a top border between successive articles so the layout accommodates future
+        articles without redesign (spec §5.2). Only one article ships now (YAGNI — no accordion/TOC).</td>
+    </tr>
+    <tr>
+      <td><code>.help-article h2</code></td>
+      <td><strong>Lighter than section <code>&lt;h2&gt;</code>:</strong> reset the heavy
+        <code>border-bottom</code>/margins so the article title reads as an article heading, not a Poročilo
+        section header — while keeping the correct <code>h1&rarr;h2</code> outline.</td>
+    </tr>
+    <tr>
+      <td><code>@media (prefers-reduced-motion: reduce)</code></td>
+      <td><code>.tab { transition:none; }</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>7. Testing</h2>
+<ul>
+  <li><strong>No new <code>node --test</code> unit file.</strong> <code>tabs.js</code> is DOM-bound; the
+    project already covers view/DOM behavior via the headless-Chrome smoke test rather than node unit
+    tests (e.g. <code>general.js</code>/<code>kirList.js</code> have none). Adding a DOM shim just for tabs
+    would violate KISS.</li>
+  <li><strong>Existing unit suite stays green</strong> unchanged — no logic module is touched. Run:
+    <code>cd src &amp;&amp; npm test</code>.</li>
+  <li><strong>Extend <code>.claude/skills/run/smoke.mjs</code></strong> to assert:
+    <ol style="margin:0.3rem 0 0;">
+      <li>On load, <code>#panel-porocilo</code> is visible and <code>#panel-pomoc</code> is
+        <code>hidden</code>; <code>tab-porocilo</code> has <code>aria-selected="true"</code>.</li>
+      <li>Clicking "Pomoč" shows the help panel (oss-note + "Pomnenje" article present) and hides the
+        form; <code>aria-selected</code> flips.</li>
+      <li>Arrow-key navigation moves selection between the two tabs (keyboard operability, spec §4).</li>
+      <li><strong>State preservation:</strong> type a Glava value, switch to "Pomoč" and back, assert the
+        value is still present (and, optionally, that a revealed error stays revealed).</li>
+    </ol>
+  </li>
+</ul>
+
+<h2>8. Build sequence</h2>
+<ol>
+  <li><strong>index.html</strong> — insert tablist, wrap current content in <code>#panel-porocilo</code>,
+    rewrite <code>.app-intro</code>, add static <code>#panel-pomoc</code> (verbatim copy). App still works
+    (panel visible; Pomoč static) even before <code>tabs.js</code> exists.</li>
+  <li><strong>styles.css</strong> — add the tab-bar and Pomoč rules (§6).</li>
+  <li><strong>view/tabs.js</strong> — the controller (§4).</li>
+  <li><strong>main.js</strong> — import and call <code>initTabs(...)</code> after mounting.</li>
+  <li><strong>smoke.mjs</strong> — add the tab/state-preservation checks (§7); run unit tests + smoke test.</li>
+</ol>
+
+<h2>9. Assumptions &amp; out-of-scope</h2>
+<ul>
+  <li><strong>Out of scope (spec §3/§8):</strong> deep-linking / URL-hash tab state, any help article
+    beyond "Pomnenje", help search / table of contents / accordion, more than two tabs, dark theme, and
+    any change to persistence, FURS fields, validation, serialization, or the <code>DDV_KIR_KPR</code>
+    output.</li>
+  <li><strong>Assumptions:</strong> (a) the repository URL is
+    <code>https://github.com/zanvd/ddv-reporter</code> (spec §6.2); (b) the tab bar's accessible name is
+    "Zavihki" (from the approved mockup; a non-user-facing ARIA label, not spec copy — flagged here in case
+    a different label is preferred); (c) the section card styling (<code>section{background:var(--bg-soft)…}</code>)
+    still applies to the three Poročilo sections inside the panel and needs no change, and the Pomoč panel
+    uses <code>&lt;article&gt;</code> (not <code>&lt;section&gt;</code>) so that card style does not bleed
+    into help content.</li>
+</ul>
+
+</body>
+</html>

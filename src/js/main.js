@@ -13,6 +13,7 @@ import { renderGeneral } from './view/general.js';
 import { renderKirList } from './view/kirList.js';
 import { renderKprList } from './view/kprList.js';
 import { renderPersistControls } from './view/persistControls.js';
+import { initTabs } from './view/tabs.js';
 
 const state = createState();
 
@@ -45,6 +46,8 @@ const kprView = renderKprList(kprContainer, state);
 if (restoredGeneral) generalView.revealErrors();
 
 renderPersistControls(generalPersistContainer, state);
+
+initTabs(document.querySelector('[role="tablist"]'));
 
 const downloadButton = document.getElementById('download-button');
 const downloadMessage = document.getElementById('download-message');
