@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DDV Reporter — Initial Implementation Plan</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --muted: #5a5a5a;
+    --accent: #0b5c8a;
+    --border: #d5d9dd;
+    --bg-soft: #f6f8fa;
+    --code-bg: #eef1f4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    line-height: 1.55;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 5rem;
+  }
+  h1 { font-size: 1.8rem; line-height: 1.2; margin: 0 0 0.4rem; }
+  h2 {
+    font-size: 1.25rem;
+    margin: 2.4rem 0 0.8rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 2px solid var(--border);
+  }
+  h3 { font-size: 1.05rem; margin: 1.6rem 0 0.6rem; color: var(--accent); }
+  p, li { font-size: 0.95rem; }
+  code {
+    background: var(--code-bg);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85em;
+  }
+  pre {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.65rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--bg-soft); font-weight: 600; }
+  tr:nth-child(even) td { background: #fbfcfd; }
+  .meta {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin: 0.15rem 0;
+  }
+  .meta strong { color: var(--fg); }
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--bg-soft);
+    padding: 0.7rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.9rem;
+  }
+  .decision {
+    border-left: 4px solid #2e7d32;
+    background: #f2faf3;
+    padding: 0.6rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.88rem;
+  }
+  ul { padding-left: 1.3rem; }
+  a { color: var(--accent); word-break: break-word; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+
+<h1>DDV Reporter — Initial Implementation Plan</h1>
+<p class="meta"><strong>Plan version:</strong> 1.0</p>
+<p class="meta"><strong>Date:</strong> 2026-07-15</p>
+<p class="meta"><strong>Implements spec:</strong> <code>specs/0001-vat_records_kir_kpr_json_export.html</code> (v1.1, confirmed)</p>
+<p class="meta"><strong>Status:</strong> Approved — ready to build</p>
+<p class="meta"><strong>Scope:</strong> Technical/architecture only. The spec is the binding source of requirements; this plan describes <em>how</em> to build exactly what it specifies.</p>
+
+<div class="decision">
+  <strong>Settled decisions (approved by user):</strong>
+  <ol style="margin:0.3rem 0 0;">
+    <li>Vanilla HTML/CSS/JS, <strong>no build tooling</strong>, no framework, no runtime dependencies.</li>
+    <li><strong>Hand-rolled</strong> format validation (no ajv, no bundled FURS JSON Schema).</li>
+    <li>Header flags <code>KIR</code>, <code>KPR</code>, <code>VRACILO</code>, <code>ODBDELEZ</code> serialize as native JSON <code>true</code>/<code>false</code>.</li>
+  </ol>
+</div>
+
+<h2>1. Overview</h2>
+<p>
+  A fully client-side, single-page web application. The user fills a form using human-readable
+  Slovenian labels; the application keeps all state in memory, runs client-side format validation,
+  and on <strong>Download</strong> assembles a single <code>DDV_KIR_KPR</code> JSON document (using
+  FURS field codes) and hands it to the browser as a file. There is no backend, no persistence, and
+  no network traffic — the spec's non-goals (§9) make this a pure front-end artifact that can run by
+  opening a local file. Guiding principles: <strong>KISS / YAGNI</strong> — expose only the minimal
+  field subset from spec §5–§6, hardcode what the spec fixes (<code>OBRAVNAVA = "1"</code>), and
+  auto-derive everything the spec marks as derived (<code>ZAPST</code>, <code>OBDOBJE</code>,
+  <code>OBDOBJE_OD</code>/<code>OBDOBJE_DO</code>, and the <code>KIR</code>/<code>KPR</code> flags).
+</p>
+
+<h2>2. Technology</h2>
+<table>
+  <thead>
+    <tr><th>Choice</th><th>Justification (traced to spec)</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Vanilla HTML5 + CSS + ES2020 JavaScript (ES modules), no build step</td>
+      <td>Spec §1/§8 require a <em>standalone, client-side</em> app where "no data leaves the browser."
+        Zero-build vanilla is the simplest thing that satisfies this; it runs from the local filesystem
+        and mirrors how the spec itself ships (a self-contained HTML file). KISS/YAGNI: the minimal v1
+        field set does not warrant a framework or bundler.</td>
+    </tr>
+    <tr>
+      <td>No runtime dependencies</td>
+      <td>All logic (derivation, validation, serialization, download) is expressible with the standard
+        DOM + <code>Blob</code>/<code>URL</code> APIs. Nothing in the spec requires third-party code.</td>
+    </tr>
+    <tr>
+      <td>Hand-rolled validation</td>
+      <td>The §7 rules are a small, closed set of regex / numeric-range / date / enum / pairing checks
+        over the v1 subset. A schema validator (ajv) plus the full FURS schema would pull in a build
+        toolchain and validate far more than v1 produces — rejected on YAGNI grounds.</td>
+    </tr>
+    <tr>
+      <td>Static country-code table (inline JS constant)</td>
+      <td>§7 fixes the allowed set: EU member states + <code>SI</code> + <code>XI</code>, with
+        <code>GR</code>/<code>EL</code> both accepted for Greece. A hardcoded array is sufficient and
+        needs no lookup service (§9 forbids FURS online lookups).</td>
+    </tr>
+    <tr>
+      <td>Tooling (dev only, optional): a static file server for local testing; a lightweight test
+        runner for the pure modules</td>
+      <td>Not shipped with the app. Only used to exercise the pure logic modules (§9 of this plan).
+        Does not add a runtime dependency or a build step to the deliverable.</td>
+    </tr>
+  </tbody>
+</table>
+<div class="callout">
+  <strong>Browser APIs relied upon:</strong> DOM, <code>&lt;input type="date"&gt;</code> and
+  <code>&lt;select&gt;</code> for structured entry, <code>Blob</code> + <code>URL.createObjectURL</code>
+  + a programmatic <code>&lt;a download&gt;</code> click for the file save, and <code>JSON.stringify</code>
+  for serialization. All are broadly available in current evergreen browsers.
+</div>
+
+<h2>3. Domain model</h2>
+<p>
+  Three plain in-memory objects: one <strong>header</strong> and two arrays of <strong>entries</strong>.
+  Form state stores raw user input plus a period selection; FURS-coded values are computed only at
+  serialization time. The two entry types are modeled <em>separately</em> — the spec reuses field codes
+  with different meanings across the lists (e.g. KIR <code>P7</code> = net amount vs. KPR <code>P7</code>
+  = supplier country code), so conflating them would be a source of bugs.
+</p>
+
+<h3>3.1 Header (form state → <code>Glava</code>)</h3>
+<table>
+  <thead>
+    <tr><th>Form state field</th><th>Type</th><th>Maps to FURS</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>taxPayerID</td><td>string</td><td><code>TaxPayerID</code></td><td>Exactly 8 digits, no "SI" prefix (§5, §7)</td></tr>
+    <tr><td>periodType</td><td><code>"monthly"</code> | <code>"quarterly"</code></td><td>—</td><td>Drives all period derivation (§5)</td></tr>
+    <tr><td>periodUnit</td><td>1–12 (month) or 1–4 (quarter)</td><td>—</td><td>The specific month or quarter</td></tr>
+    <tr><td>periodYear</td><td>number (YYYY)</td><td>—</td><td>Used to build full dates</td></tr>
+    <tr><td>vracilo</td><td>boolean</td><td><code>VRACILO</code></td><td>Checkbox, default <code>false</code> (§5)</td></tr>
+    <tr><td>odbdelez</td><td>boolean</td><td><code>ODBDELEZ</code></td><td>Checkbox, default <code>false</code> (§5)</td></tr>
+    <tr><td colspan="4"><em>Derived at serialize time (not stored):</em></td></tr>
+    <tr><td>—</td><td>string <code>YYYY-MM-DD</code></td><td><code>OBDOBJE_OD</code></td><td>First day of the selected period</td></tr>
+    <tr><td>—</td><td>string <code>YYYY-MM-DD</code></td><td><code>OBDOBJE_DO</code></td><td>Last day of the selected period</td></tr>
+    <tr><td>—</td><td>boolean</td><td><code>KIR</code></td><td><code>true</code> iff ≥1 charged entry (§5)</td></tr>
+    <tr><td>—</td><td>boolean</td><td><code>KPR</code></td><td><code>true</code> iff ≥1 deducted entry (§5)</td></tr>
+  </tbody>
+</table>
+
+<h3>3.2 KIR entry (charged / output) → <code>Lista_KIR.KIR[]</code></h3>
+<table>
+  <thead>
+    <tr><th>Form state field</th><th>Maps to FURS</th><th>Required</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>postingDate</td><td><code>P2</code></td><td>Yes</td><td><code>YYYY-MM-DD</code>, not future</td></tr>
+    <tr><td>documentNumber</td><td><code>P3</code></td><td>Yes</td><td>Text, ≤250</td></tr>
+    <tr><td>documentDate</td><td><code>P4</code></td><td>Yes</td><td><code>YYYY-MM-DD</code>, not future</td></tr>
+    <tr><td>customerCountry</td><td><code>P6</code></td><td>Optional*</td><td>ISO country code; paired with <code>P6DS</code></td></tr>
+    <tr><td>customerVatId</td><td><code>P6DS</code></td><td>Optional*</td><td>≤25 chars, no country prefix; paired with <code>P6</code></td></tr>
+    <tr><td>netValue</td><td><code>P7</code></td><td>Optional</td><td>Amount; omitted if blank</td></tr>
+    <tr><td>vat22</td><td><code>P14</code></td><td>Optional</td><td>Amount; omitted if blank</td></tr>
+    <tr><td>vat95</td><td><code>P15</code></td><td>Optional</td><td>Amount; omitted if blank</td></tr>
+    <tr><td>vat5</td><td><code>P16</code></td><td>Optional</td><td>Amount; omitted if blank</td></tr>
+    <tr><td colspan="4"><em>Auto-managed:</em> <code>ZAPST</code> (consecutive), <code>OBDOBJE</code> (MMMM, from header), <code>OBRAVNAVA</code> = <code>"1"</code></td></tr>
+  </tbody>
+</table>
+<p style="font-size:0.85rem;">* <code>P6</code>/<code>P6DS</code> must be <strong>both present or both empty</strong> (§7).</p>
+
+<h3>3.3 KPR entry (deducted / input) → <code>Lista_KPR.KPR[]</code></h3>
+<table>
+  <thead>
+    <tr><th>Form state field</th><th>Maps to FURS</th><th>Required</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>postingDate</td><td><code>P2</code></td><td>Yes</td><td><code>YYYY-MM-DD</code>, not future</td></tr>
+    <tr><td>documentNumber</td><td><code>P3</code></td><td>Yes</td><td>Text, ≤250</td></tr>
+    <tr><td>dateReceived</td><td><code>P4</code></td><td>Yes</td><td><code>YYYY-MM-DD</code>, not future</td></tr>
+    <tr><td>documentDate</td><td><code>P5</code></td><td>Yes</td><td><code>YYYY-MM-DD</code>, not future</td></tr>
+    <tr><td>supplierName</td><td><code>P6</code></td><td>Yes</td><td>Text, ≤250</td></tr>
+    <tr><td>supplierCountry</td><td><code>P7</code></td><td>Yes</td><td>ISO country code (per FURS JSON Schema — §6.2 note)</td></tr>
+    <tr><td>supplierVatId</td><td><code>P7DS</code></td><td>Yes</td><td>≤25 chars, no country prefix</td></tr>
+    <tr><td>netValue</td><td><code>P8</code></td><td>Optional</td><td>Amount; omitted if blank</td></tr>
+    <tr><td>deductVat22</td><td><code>P18</code></td><td>Optional</td><td>Amount; omitted if blank</td></tr>
+    <tr><td>deductVat95</td><td><code>P19</code></td><td>Optional</td><td>Amount; omitted if blank</td></tr>
+    <tr><td>deductVat5</td><td><code>P20</code></td><td>Optional</td><td>Amount; omitted if blank</td></tr>
+    <tr><td>flatRate8</td><td><code>P21</code></td><td>Optional</td><td>Amount; omitted if blank</td></tr>
+    <tr><td colspan="4"><em>Auto-managed:</em> <code>ZAPST</code> (consecutive), <code>OBDOBJE</code> (MMMM, from header), <code>OBRAVNAVA</code> = <code>"1"</code></td></tr>
+  </tbody>
+</table>
+
+<h3>3.4 Output document shape (§4)</h3>
+<pre>DDV_KIR_KPR
+├── Glava            { TaxPayerID, OBDOBJE_OD, OBDOBJE_DO, KIR, KPR, VRACILO, ODBDELEZ }
+├── Lista_KIR
+│   └── KIR: [ { ZAPST, OBDOBJE, OBRAVNAVA, P2, P3, P4, P6?, P6DS?, P7?, P14?, P15?, P16? }, … ]
+└── Lista_KPR
+    └── KPR: [ { ZAPST, OBDOBJE, OBRAVNAVA, P2, P3, P4, P5, P6, P7, P7DS, P8?, P18?, P19?, P20?, P21? }, … ]</pre>
+<p>
+  Fields marked <code>?</code> are omitted entirely when the user leaves them blank (§6, §8) — never
+  emitted as <code>0</code> or <code>""</code>. When a list has no entries, its header flag is
+  <code>false</code> and the empty list is carried as an empty array (§4).
+</p>
+
+<h2>4. Architecture</h2>
+<p>
+  Small module set, each with a single responsibility. Logic that must be correct (derivation,
+  validation, serialization) is isolated into <strong>pure functions</strong> with no DOM access, so
+  it is directly unit-testable. The view layer is the only part that touches the DOM.
+</p>
+<pre>
+ ┌──────────────────────────────────────────────────────────────┐
+ │  view (DOM)  — form, dynamic KIR list, dynamic KPR list        │
+ │     • renders inputs & inline errors                          │
+ │     • wires add / edit / remove & Download button             │
+ └───────────────┬───────────────────────────────┬──────────────┘
+                 │ mutates                        │ reads
+                 ▼                                │
+        ┌─────────────────┐                       │
+        │  state (memory) │  header + kir[] + kpr[]│
+        │  add/edit/remove│◄──────────────────────┘
+        └───────┬─────────┘
+                │ feeds pure functions
+   ┌────────────┼───────────────────────────────┐
+   ▼            ▼                                ▼
+┌─────────┐ ┌──────────────┐            ┌────────────────┐
+│derive   │ │validate      │            │serialize       │
+│OBDOBJE* │ │§7 rules →    │            │state→DDV_KIR_KPR│
+│ZAPST    │ │field errors  │            │(codes, omit    │
+│flags    │ │              │            │ blanks)        │
+└─────────┘ └──────┬───────┘            └───────┬────────┘
+                   │ gates                      │ JSON string
+                   ▼                            ▼
+             Download button ───────────► download (Blob → file)
+</pre>
+
+<table>
+  <thead>
+    <tr><th>Module</th><th>Responsibility</th><th>DOM?</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>state</code></td><td>Holds header + <code>kir[]</code> + <code>kpr[]</code>; exposes add / edit / remove operations; re-runs <code>ZAPST</code> renumbering after list changes.</td><td>No</td></tr>
+    <tr><td><code>derive</code></td><td>Pure: period selection → <code>OBDOBJE_OD</code>, <code>OBDOBJE_DO</code>, <code>OBDOBJE</code> (MMMM); <code>KIR</code>/<code>KPR</code> flags from list lengths.</td><td>No</td></tr>
+    <tr><td><code>validate</code></td><td>Pure: applies all §7 rules; returns a structured map of field → error message. Single source of truth for both live inline errors and the Download gate.</td><td>No</td></tr>
+    <tr><td><code>serialize</code></td><td>Pure: state → <code>DDV_KIR_KPR</code> object with FURS codes; omits blank optional amounts; then <code>JSON.stringify</code>.</td><td>No</td></tr>
+    <tr><td><code>countries</code></td><td>Static allowed-code set + <code>GR</code>/<code>EL</code> handling helper.</td><td>No</td></tr>
+    <tr><td><code>download</code></td><td>Wraps the JSON string in a <code>Blob</code>, creates an object URL, triggers the file save, revokes the URL.</td><td>Minimal</td></tr>
+    <tr><td><code>view</code></td><td>Renders the form and the two dynamic lists; binds inputs to <code>state</code>; shows inline validation; wires the Download button to the gate.</td><td>Yes</td></tr>
+  </tbody>
+</table>
+
+<p>
+  <strong>Data flow:</strong> user input → <code>state</code> → live <code>validate</code> (inline
+  feedback) → on <strong>Download</strong>: <code>validate</code> everything (gate) → if clean:
+  <code>derive</code> → <code>serialize</code> → <code>download</code>. Validation lives in exactly one
+  module and is invoked both live and as the Download gate, so the app can never emit a
+  format-invalid file (§7, §8).
+</p>
+
+<h2>5. Key implementation concerns</h2>
+
+<h3>5.1 Period derivation</h3>
+<ul>
+  <li><strong>Monthly:</strong> <code>OBDOBJE_OD</code> = first day of month; <code>OBDOBJE_DO</code> =
+    last day of month (calendar-correct, incl. leap Feb); <code>MMMM</code> = <code>MM</code>+<code>MM</code>
+    (e.g. June → <code>0606</code>).</li>
+  <li><strong>Quarterly:</strong> quarter <em>n</em> → start month <code>3n−2</code>, end month <code>3n</code>;
+    <code>OBDOBJE_OD</code>/<code>OBDOBJE_DO</code> span the quarter; <code>MMMM</code> = start+end month
+    (e.g. Q2 → <code>0406</code>).</li>
+  <li>The single derived <code>OBDOBJE</code> is written identically onto every KIR and KPR entry (§6).</li>
+</ul>
+
+<h3>5.2 Validation strategy (§7)</h3>
+<table>
+  <thead><tr><th>Rule</th><th>Implementation</th></tr></thead>
+  <tbody>
+    <tr><td><code>TaxPayerID</code></td><td>Regex <code>^[0-9]{8}$</code>.</td></tr>
+    <tr><td>Amounts</td><td>Parse as number; reject &gt;2 decimal places; enforce strictly within (−5e9, +5e9); allow negatives. Store/emit as JSON number.</td></tr>
+    <tr><td>Dates (<code>P2</code>,<code>P4</code>,<code>P5</code>)</td><td><code>YYYY-MM-DD</code> shape + real calendar date; line dates not in the future (compared to local today).</td></tr>
+    <tr><td><code>OBDOBJE</code>/period bounds</td><td>Derived, so structurally always valid; a guard asserts each entry's derived <code>OBDOBJE</code> equals the header's.</td></tr>
+    <tr><td><code>ZAPST</code></td><td>Guaranteed consecutive by renumbering on every add/remove; not user-editable.</td></tr>
+    <tr><td>Country codes</td><td>Membership test against the static allowed set; uppercase; accept <code>GR</code> and <code>EL</code> for Greece.</td></tr>
+    <tr><td>KIR <code>P6</code>/<code>P6DS</code> pairing</td><td>Both present or both empty; otherwise a paired-field error.</td></tr>
+    <tr><td>VAT-ID format</td><td>≤25 chars; reject a leading country-code prefix pattern to nudge correct entry.</td></tr>
+    <tr><td>Text fields</td><td>≤250 chars.</td></tr>
+    <tr><td>Required fields</td><td>Presence enforced per §5/§6 before Download is allowed.</td></tr>
+    <tr><td><code>VRACILO</code> foreign-taxpayer rule</td><td>Documented as inactive in v1 (no <code>TUJEC*</code> produced); not implemented (§7, §9).</td></tr>
+  </tbody>
+</table>
+<p>
+  On failure, the Download action is blocked and offending fields are flagged inline with a message
+  (§7, §8). Validation is presentation-agnostic (returns data, not DOM), keeping it testable.
+</p>
+
+<h3>5.3 Serialization correctness</h3>
+<ul>
+  <li>Amounts emitted as JSON numbers, ≤2 decimals; blank optional amounts <strong>omitted</strong>, not zeroed (§6, §8).</li>
+  <li><code>OBRAVNAVA</code> always the string <code>"1"</code> (§6).</li>
+  <li>Header flags <code>KIR</code>/<code>KPR</code>/<code>VRACILO</code>/<code>ODBDELEZ</code> as JSON booleans (settled decision 3).</li>
+  <li>Empty list ⇒ empty array + flag <code>false</code> (§4).</li>
+</ul>
+
+<h3>5.4 Edge cases from the spec</h3>
+<ul>
+  <li>Only-KIR or only-KPR filing: other list empty, its flag <code>false</code> (§4/§5).</li>
+  <li>Greece <code>GR</code> vs <code>EL</code> equivalence (§7).</li>
+  <li>Leap-year February end-of-month in quarterly/monthly period bounds.</li>
+  <li>Future-date rejection uses the browser's local date; documented as such.</li>
+  <li>Number formatting: guard against floating-point artifacts by validating decimal-place count on the raw input string before converting.</li>
+</ul>
+
+<h3>5.5 Testing approach</h3>
+<ul>
+  <li>Unit tests target the pure modules — <code>derive</code>, <code>validate</code>,
+    <code>serialize</code>, <code>countries</code> — which carry all the risk-bearing logic.</li>
+  <li>A golden-file test serializes a known fixture (mix of KIR + KPR, blank optionals, only-KIR case)
+    and compares against a hand-verified expected JSON.</li>
+  <li>Optional dev-only cross-check: validate the golden output against the FURS
+    <code>DDV_KIR_KPR_1.json</code> schema as an external oracle — not shipped, not a runtime
+    dependency.</li>
+</ul>
+
+<h2>6. Build / file structure</h2>
+<p>No bundler; files are served/opened as-is. ES modules keep the separation without a build step.</p>
+<pre>ddv-reporter/
+└── src/                          all application source lives here
+    ├── index.html            entry page; loads styles + app module
+    ├── css/
+    │   └── styles.css        form + validation-error styling
+    └── js/
+        ├── main.js           bootstraps view, owns wiring
+        ├── state.js          in-memory header + kir[] + kpr[], add/edit/remove
+        ├── derive.js         period → OBDOBJE_OD/DO/MMMM, flags, ZAPST
+        ├── validate.js       §7 rules → field-error map
+        ├── serialize.js      state → DDV_KIR_KPR object → JSON string
+        ├── countries.js      allowed ISO-code set + GR/EL helper
+        ├── download.js       Blob → file-save
+        └── view/
+            ├── header.js     header form fields
+            ├── kirList.js    charged-entry list UI
+            └── kprList.js    deducted-entry list UI</pre>
+
+<h3>6.1 Rough work sequencing</h3>
+<ol>
+  <li><code>derive.js</code> + <code>countries.js</code> (pure, no UI) with unit tests.</li>
+  <li><code>validate.js</code> (§7 rules) with unit tests.</li>
+  <li><code>serialize.js</code> with golden-file test.</li>
+  <li><code>state.js</code> (in-memory operations, <code>ZAPST</code> renumbering).</li>
+  <li><code>view/*</code> + <code>index.html</code> + <code>styles.css</code> — header, then the two lists, then inline errors.</li>
+  <li><code>download.js</code> and the Download gate wiring.</li>
+  <li>End-to-end manual pass across the §5.4 edge cases.</li>
+</ol>
+
+<h2>7. Assumptions and out-of-scope</h2>
+<h3>Assumptions</h3>
+<ul>
+  <li>Target is current evergreen desktop browsers (the app may be opened from the local filesystem).</li>
+  <li>"Not in the future" is evaluated against the user's local system date.</li>
+  <li>Header booleans serialize as JSON <code>true</code>/<code>false</code> (settled decision 3);
+    "(DA/NE)" in the spec is the human yes/no meaning, not a string literal in the JSON.</li>
+  <li>The generated download filename is a reasonable app-chosen default (e.g. incorporating tax number
+    and period); the spec does not prescribe it.</li>
+</ul>
+<h3>Out of scope (restating spec §9 as it constrains the design)</h3>
+<ul>
+  <li>DDV-O return; any XML or CSV output — JSON KIR/KPR only.</li>
+  <li>Direct submission to FURS/eDavki (no REST/SOAP, no ZIP upload).</li>
+  <li>Self-disclosure — <code>OBRAVNAVA</code> fixed to <code>"1"</code>; <code>OBDOBJE88</code>/<code>DAVEK88</code> not produced.</li>
+  <li>Foreign-taxpayer / representative filing — <code>TUJEC1</code>/<code>TUJEC2</code> and the dependent <code>VRACILO</code> rule not produced.</li>
+  <li>Non-core amount fields (intra-EU, reverse-charge, imports, exempt, real-estate/fixed-asset, non-deductible VAT, etc.).</li>
+  <li>Tax-register (RDZ) / online-service validation.</li>
+  <li>Accounts, authentication, authorization.</li>
+  <li>Persistence between sessions (no drafts, no storage, no server).</li>
+  <li>Header extras <code>NACIN</code>, <code>INSPOS</code>, <code>PREDLODO</code>, <code>OPOMBA</code>.</li>
+</ul>
+
+</body>
+</html>
