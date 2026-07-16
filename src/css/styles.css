@@ -11,6 +11,7 @@
   --border: #d5d9dd;
   --bg-soft: #f6f8fa;
   --error: #b3261e;
+  --success: #2e7d32;
 }
 
 * {
@@ -104,6 +105,80 @@ section {
 .field-checkbox input {
   width: 1.1rem;
   height: 1.1rem;
+}
+
+.persist-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.persist-button {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.persist-button.forget {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.persist-button:disabled {
+  border-color: var(--border);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.persist-feedback {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.persist-feedback[hidden] {
+  display: none;
+}
+
+.persist-feedback-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.persist-feedback-success .persist-feedback-icon::before {
+  content: "\2713";
+  color: var(--success);
+}
+
+.persist-feedback-success .persist-feedback-text {
+  color: var(--success);
+}
+
+.persist-feedback-error .persist-feedback-icon {
+  background: var(--error);
+  color: #fff;
+}
+
+.persist-feedback-error .persist-feedback-icon::before {
+  content: "\2715";
+}
+
+.persist-feedback-error .persist-feedback-text {
+  color: var(--error);
 }
 
 button {

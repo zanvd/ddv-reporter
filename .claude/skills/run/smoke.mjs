@@ -106,7 +106,7 @@ async function main() {
   await send('Page.navigate', { url: APP_URL });
   await waitFor(`!!document.querySelector('#general-content input')`, 'general form rendered');
   await shot('01-initial');
-  check('h1 = "DDV Reporter"', (await evalJs(`document.querySelector('h1').textContent`)) === 'DDV Reporter');
+  check('h1 = "DDV Poročilo"', (await evalJs(`document.querySelector('h1').textContent`)) === 'DDV Poročilo');
   check('three section headings', (await evalJs(`document.querySelectorAll('h2').length`)) === 3);
   check('no errors on load (quiet-until-touched)', (await errorsIn('#general-content')).length === 0);
   check('both lists show empty state',

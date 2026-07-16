@@ -5,14 +5,22 @@
 
 import { derivePeriod } from './derive.js';
 import { buildDownloadFilename, downloadJson } from './download.js';
+import { loadGeneral } from './generalStore.js';
 import { serialize } from './serialize.js';
-import { createState } from './state.js';
+import { createState, updateGeneral } from './state.js';
 import { hasAnyErrors, validateState } from './validate.js';
 import { renderGeneral } from './view/general.js';
 import { renderKirList } from './view/kirList.js';
 import { renderKprList } from './view/kprList.js';
+import { renderPersistControls } from './view/persistControls.js';
 
 const state = createState();
+
+// Auto-restore the saved Glava record (if any) before the general view is
+// built, so the form renders already prefilled (spec 0002 §6.4). KIR/KPR
+// are never restored — they always start empty.
+const restoredGeneral = loadGeneral();
+if (restoredGeneral) updateGeneral(state, restoredGeneral);
 
 // Each view mounts into an inner content <div>, not the whole <section>,
 // so its container.replaceChildren() never wipes out the section's static
@@ -20,6 +28,7 @@ const state = createState();
 const generalContainer = document.getElementById('general-content');
 const kirContainer = document.getElementById('kir-content');
 const kprContainer = document.getElementById('kpr-content');
+const generalPersistContainer = document.getElementById('general-persist');
 
 // The Download gate calls revealErrors() on all three views so clicking
 // Download surfaces every remaining error at once, even for fields the
@@ -27,6 +36,15 @@ const kprContainer = document.getElementById('kpr-content');
 const generalView = renderGeneral(generalContainer, state);
 const kirView = renderKirList(kirContainer, state);
 const kprView = renderKprList(kprContainer, state);
+
+// Restored Glava fields are treated as already "touched", so any stale or
+// now-invalid restored value surfaces its error immediately rather than
+// staying quiet until the user happens to interact with that field (spec
+// 0002 §6.4 — a deliberate, feature-specific deviation from the app's
+// normal quiet-until-touched rule; a fresh, non-restored form is unaffected).
+if (restoredGeneral) generalView.revealErrors();
+
+renderPersistControls(generalPersistContainer, state);
 
 const downloadButton = document.getElementById('download-button');
 const downloadMessage = document.getElementById('download-message');

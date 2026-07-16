@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DDV Reporter — Persist General (Glava) Data Implementation Plan</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --muted: #5a5a5a;
+    --accent: #0b5c8a;
+    --border: #d5d9dd;
+    --bg-soft: #f6f8fa;
+    --code-bg: #eef1f4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    line-height: 1.55;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 5rem;
+  }
+  h1 { font-size: 1.8rem; line-height: 1.2; margin: 0 0 0.4rem; }
+  h2 {
+    font-size: 1.25rem;
+    margin: 2.4rem 0 0.8rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 2px solid var(--border);
+  }
+  h3 { font-size: 1.05rem; margin: 1.6rem 0 0.6rem; color: var(--accent); }
+  p, li { font-size: 0.95rem; }
+  code {
+    background: var(--code-bg);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85em;
+  }
+  pre {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.65rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--bg-soft); font-weight: 600; }
+  tr:nth-child(even) td { background: #fbfcfd; }
+  .meta {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin: 0.15rem 0;
+  }
+  .meta strong { color: var(--fg); }
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--bg-soft);
+    padding: 0.7rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.9rem;
+  }
+  .decision {
+    border-left: 4px solid #2e7d32;
+    background: #f2faf3;
+    padding: 0.6rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.88rem;
+  }
+  .flag {
+    border-left: 4px solid #b8860b;
+    background: #fdf9ef;
+    padding: 0.6rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.88rem;
+  }
+  ul { padding-left: 1.3rem; }
+  a { color: var(--accent); word-break: break-word; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+
+<h1>DDV Reporter — Persist General (Glava) Data Implementation Plan</h1>
+<p class="meta"><strong>Plan version:</strong> 1.0</p>
+<p class="meta"><strong>Date:</strong> 2026-07-16</p>
+<p class="meta"><strong>Implements spec:</strong> <code>specs/0002-persist_general_data.html</code> (v1.1, confirmed)</p>
+<p class="meta"><strong>Builds on plan:</strong> <code>impls/0001-vat_records_kir_kpr_json_export.html</code> (the module set this feature extends)</p>
+<p class="meta"><strong>Status:</strong> Draft — ready to build</p>
+<p class="meta"><strong>Scope:</strong> Technical/architecture only. The spec is the binding source of requirements; this plan describes <em>how</em> to build exactly what it specifies.</p>
+
+<div class="decision">
+  <strong>Settled decisions (this plan):</strong>
+  <ol style="margin:0.3rem 0 0;">
+    <li><strong>Plain <code>localStorage</code></strong>, accessed through one generic, DOM-free
+      <code>storage.js</code> module. No dependency, no build step — consistent with the project's
+      zero-dependency constraint.</li>
+    <li><strong>One key per data domain</strong>, namespaced <code>ddvReporter.&lt;domain&gt;</code>
+      (Glava &rarr; <code>ddvReporter.general</code>); each value is a self-describing envelope
+      <code>{ "version": 1, "data": {…} }</code>. This is the answer to the spec §7 forward-compatibility
+      constraint (§2 below).</li>
+    <li><strong>Two new non-view modules</strong> (<code>storage.js</code> generic, <code>generalStore.js</code>
+      Glava-specific) and <strong>one new view module</strong> (<code>view/persistControls.js</code>).
+      <code>state.js</code>, <code>validate.js</code>, and <code>view/general.js</code> stay
+      <strong>unchanged</strong>.</li>
+    <li><strong>Auto-restore reuses the existing <code>revealErrors()</code></strong> to satisfy the
+      "restored fields are already touched" rule (§6.4), so <code>general.js</code>'s quiet-until-touched
+      flow is untouched.</li>
+  </ol>
+</div>
+
+<h2>1. Overview</h2>
+<p>
+  Add opt-in, local-only persistence of the <strong>Glava section only</strong> to the existing
+  fully client-side app. Two buttons — <strong>"Zapomni si"</strong> (save) and <strong>"Pozabi"</strong>
+  (forget) — write/remove a snapshot of the six general-section fields to the browser's
+  <code>localStorage</code>; on the next app open the form auto-restores from that snapshot. No backend,
+  no network, nothing new leaves the browser. The feature introduces <strong>no tax logic</strong> and
+  changes nothing about the <code>DDV_KIR_KPR</code> output, the download flow, or FURS validation
+  (spec §10). Guiding principles: <strong>KISS / YAGNI</strong> — reuse the app's existing state,
+  validation, and button visual language; add the smallest module set that satisfies the spec; and design
+  the storage scheme so <em>future</em> persisted domains slot in beside Glava without migration
+  (the one piece of deliberate, spec-mandated forward-looking structure — §2).
+</p>
+
+<h2>2. Storage design (central decision — spec §7)</h2>
+<p>
+  The spec's binding constraint: Glava is the <strong>first of potentially several</strong> persisted
+  data domains; the scheme must let later domains be added, read, and removed
+  <strong>independently</strong>, with no migration or reshaping of what this feature stores, and
+  <strong>not</strong> as a single flat blob under one key.
+</p>
+
+<h3>2.1 Key scheme — one key per domain</h3>
+<p>
+  Each independent data domain gets its <strong>own <code>localStorage</code> key</strong>, under a fixed
+  application namespace:
+</p>
+<pre>ddvReporter.&lt;domain&gt;
+
+  ddvReporter.general      &larr; this feature (the six Glava fields)
+  ddvReporter.&lt;future&gt;     &larr; a later feature adds its own key, independently</pre>
+<ul>
+  <li><strong>Independently addressable:</strong> a future domain writes/reads its own key; it never
+    reads or parses <code>ddvReporter.general</code>.</li>
+  <li><strong>Independently removable:</strong> "Pozabi" calls <code>removeItem("ddvReporter.general")</code>,
+    which touches only Glava. A future domain's forget touches only its own key.</li>
+  <li><strong>No shared blob to migrate:</strong> because each domain is a separate key, adding a domain
+    is purely additive — no existing record is restructured. This is the explicit rejection of the
+    single-flat-blob approach the spec forbids.</li>
+</ul>
+
+<h3>2.2 Value shape — a self-describing envelope</h3>
+<p>Each key's value is a JSON string wrapping the domain payload in a small versioned envelope:</p>
+<pre>ddvReporter.general  =  {
+  "version": 1,
+  "data": {
+    "taxPayerID": "12345678",
+    "periodType": "monthly",
+    "periodUnit": "6",
+    "periodYear": "2026",
+    "vracilo": false,
+    "odbdelez": false
+  }
+}</pre>
+<ul>
+  <li><strong>Per-domain versioning</strong> lives <em>inside</em> the envelope (not in the key), so each
+    domain can evolve its own shape later without a key rename and without affecting other domains'
+    versions. Only <code>version: 1</code> exists today; the read path is tolerant of anything it does not
+    recognize (§6.4).</li>
+  <li><strong>Payload = plain snapshot</strong> of the domain's fields — for Glava, exactly the six
+    general-section state fields (§3), stored as-is (spec §6.1 "save-as-is, no validation gate").</li>
+</ul>
+
+<div class="callout">
+  <strong>Considered and rejected:</strong> (a) version in the key path (<code>ddvReporter.v1.general</code>)
+  — pushes migration into key renaming and complicates "remove this domain"; the in-value envelope keeps
+  the key stable and the version a per-domain concern. (b) A single <code>ddvReporter</code> key holding
+  an object of all domains — this is exactly the flat blob the spec §7 forbids, since a later domain would
+  have to read-modify-write (and risk clobbering) the shared record.
+</div>
+
+<h2>3. Domain model</h2>
+<p>
+  No new in-memory entity is introduced — the persisted record <strong>is</strong> a snapshot of the
+  existing <code>state.general</code> object (defined in plan 0001 §3.1, created by
+  <code>createState()</code>). The persisted <code>data</code> payload is exactly the six Glava fields;
+  KIR/KPR are never included (spec §3, §4).
+</p>
+<table>
+  <thead>
+    <tr><th>State field (<code>state.general</code>)</th><th>Type</th><th>FURS wire field</th><th>Persisted as</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>taxPayerID</code></td><td>string</td><td><code>TaxPayerID</code></td><td>string, as entered (may be empty/partial)</td></tr>
+    <tr><td><code>periodType</code></td><td><code>"monthly"</code> | <code>"quarterly"</code></td><td>—</td><td>string</td></tr>
+    <tr><td><code>periodUnit</code></td><td>string (<code>""</code> or 1–12 / 1–4)</td><td>—</td><td>string (empty if none chosen)</td></tr>
+    <tr><td><code>periodYear</code></td><td>string (YYYY)</td><td>—</td><td>string, as entered (may be empty/partial)</td></tr>
+    <tr><td><code>vracilo</code></td><td>boolean</td><td><code>VRACILO</code></td><td>boolean</td></tr>
+    <tr><td><code>odbdelez</code></td><td>boolean</td><td><code>ODBDELEZ</code></td><td>boolean</td></tr>
+  </tbody>
+</table>
+<p>
+  The <strong>field whitelist</strong> (these six keys) is the one piece of Glava-specific domain knowledge;
+  it lives in <code>generalStore.js</code> (§5), not in the generic storage layer. Save picks exactly these
+  keys off <code>state.general</code>; restore overlays exactly these keys onto the default state — anything
+  else present in a stored record is ignored (spec §8, older/unknown fields).
+</p>
+
+<h2>4. Technology</h2>
+<table>
+  <thead>
+    <tr><th>Choice</th><th>Justification (traced to spec / conventions)</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Browser <code>localStorage</code> via <code>getItem</code>/<code>setItem</code>/<code>removeItem</code></td>
+      <td>Spec §1/§3 require single-browser, local-only, no-sync persistence that survives across sessions.
+        <code>localStorage</code> is the exact fit: synchronous, per-origin, string key/value, no dependency.
+        <code>sessionStorage</code> is wrong (does not survive a new session); IndexedDB is overkill for six
+        scalar fields (YAGNI).</td>
+    </tr>
+    <tr>
+      <td>No new runtime dependency, no build step</td>
+      <td>Project conventions (CLAUDE.md): vanilla ES-module JS, no framework/bundler. JSON
+        (<code>JSON.stringify</code>/<code>parse</code>) covers envelope (de)serialization.</td>
+    </tr>
+    <tr>
+      <td>Total <code>try/catch</code> around every storage access (incl. the property read itself)</td>
+      <td>Spec §8 / §6.6: private-mode restrictions, disabled storage, or quota-exceeded must fail
+        <em>safely</em> (red indicator, memory untouched). In some browsers even <em>reading</em>
+        <code>globalThis.localStorage</code> or calling <code>setItem</code> throws; every access is guarded
+        and reduced to a boolean success / <code>null</code> read.</td>
+    </tr>
+    <tr>
+      <td>Injectable storage backend (defaults to <code>globalThis.localStorage</code>)</td>
+      <td>Keeps <code>storage.js</code> unit-testable under Node's built-in runner (no DOM/localStorage):
+        tests pass a Map-backed fake and a throwing fake. Matches the project's DOM-free-pure-logic testing
+        pattern.</td>
+    </tr>
+    <tr>
+      <td>Feedback icons as inline markup (Unicode/CSS), not image assets</td>
+      <td>Spec §5/§6.6: reuse the existing status palette (<code>--error</code>, an app-consistent green),
+        "no new visual language." Green check "&#10003;" and red circle-with-X rendered from CSS tokens;
+        no external assets (self-contained app).</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>5. Architecture</h2>
+<p>
+  Two new DOM-free modules on the logic side and one new view module, plus small wiring edits to
+  <code>main.js</code>, <code>index.html</code>, and <code>styles.css</code>. The generic/Glava-specific
+  split mirrors the spec §7 intent: <code>storage.js</code> is the reusable seam future domains share;
+  <code>generalStore.js</code> is the Glava-only glue.
+</p>
+<pre>
+ ┌───────────────────────────────────────────────────────────────┐
+ │ main.js (bootstrap / wiring)                                   │
+ │   on open:  loadGeneral() ─┐                                   │
+ │            updateGeneral() │ (prefill BEFORE render)           │
+ │            renderGeneral() │                                   │
+ │            if restored → generalView.revealErrors()  (§6.4)    │
+ │            renderPersistControls(#general-persist, state)      │
+ └───────────────┬───────────────────────────────┬───────────────┘
+                 │ mounts                         │ reads state.general
+                 ▼                                ▼
+   ┌──────────────────────────────┐   ┌──────────────────────────┐
+   │ view/persistControls.js (DOM)│   │ view/general.js  (DOM)    │
+   │  • "Zapomni si" / "Pozabi"   │   │  UNCHANGED — form + touch │
+   │  • enable/disable + feedback │   │  + revealErrors()         │
+   │    (3 s timers)              │   └──────────────────────────┘
+   └───────────────┬──────────────┘
+                   │ calls (save / forget / has)
+                   ▼
+        ┌────────────────────────┐   Glava whitelist + defaults +
+        │ generalStore.js  (logic)│  envelope version for domain
+        │  saveGeneral(general)   │  "general"
+        │  loadGeneral()          │
+        │  forgetGeneral()        │
+        │  hasSavedGeneral()      │
+        └───────────┬────────────┘
+                    │ readRecord / writeRecord / removeRecord (domain, …)
+                    ▼
+        ┌────────────────────────┐   generic, domain-agnostic:
+        │ storage.js  (logic)    │  namespacing + envelope wrap +
+        │  keyFor(domain)        │  JSON + total try/catch
+        │  readRecord(domain)    │  (injectable backend)
+        │  writeRecord(dom,v,d)  │
+        │  removeRecord(domain)  │
+        └───────────┬────────────┘
+                    ▼
+             window.localStorage
+</pre>
+
+<table>
+  <thead>
+    <tr><th>Module</th><th>Responsibility</th><th>New / edit</th><th>DOM?</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>storage.js</code></td>
+      <td>Generic, domain-agnostic <code>localStorage</code> layer: builds the namespaced key, wraps/unwraps
+        the <code>{version,data}</code> envelope, JSON (de)serializes, and reduces every access to a safe
+        result (<code>readRecord</code>&rarr;<code>{version,data}|null</code>;
+        <code>writeRecord</code>/<code>removeRecord</code>&rarr;<code>boolean</code> success). Knows nothing
+        about Glava. Injectable backend for tests.</td>
+      <td>NEW</td><td>No</td>
+    </tr>
+    <tr>
+      <td><code>generalStore.js</code></td>
+      <td>Glava-specific glue over <code>storage.js</code>: holds the domain name (<code>"general"</code>),
+        current version (<code>1</code>), and the six-field whitelist. <code>saveGeneral</code> /
+        <code>loadGeneral</code> / <code>forgetGeneral</code> / <code>hasSavedGeneral</code>. Applies
+        whitelist filtering + defaults fallback on read.</td>
+      <td>NEW</td><td>No</td>
+    </tr>
+    <tr>
+      <td><code>view/persistControls.js</code></td>
+      <td>Renders the <code>.persist-row</code> (two buttons + per-button feedback slot); wires clicks to
+        <code>generalStore</code>; manages "Pozabi" enabled/disabled and the transient 3 s success/failure
+        feedback (§6.1–§6.6).</td>
+      <td>NEW</td><td>Yes</td>
+    </tr>
+    <tr>
+      <td><code>main.js</code></td>
+      <td>Adds auto-restore before render, the post-render <code>revealErrors()</code> call when restored,
+        and mounts <code>renderPersistControls</code>. Wiring only.</td>
+      <td>EDIT</td><td>Yes</td>
+    </tr>
+    <tr>
+      <td><code>index.html</code></td>
+      <td>Adds <code>&lt;div id="general-persist"&gt;</code> inside <code>#general-section</code>, after
+        <code>#general-content</code>, as the persist-controls mount point.</td>
+      <td>EDIT</td><td>—</td>
+    </tr>
+    <tr>
+      <td><code>styles.css</code></td>
+      <td>Adds <code>.persist-row</code>, <code>.persist-button</code>(<code>.forget</code>),
+        <code>.persist-feedback</code>(<code>.error</code>), and <code>:disabled</code> styling — built from
+        existing tokens only.</td>
+      <td>EDIT</td><td>—</td>
+    </tr>
+    <tr>
+      <td><code>state.js</code>, <code>validate.js</code>, <code>view/general.js</code></td>
+      <td>Unchanged. Restore uses the existing <code>updateGeneral</code>; touched-on-load uses the existing
+        <code>revealErrors</code>; errors come from the existing <code>validateGeneral</code> (single source
+        of truth).</td>
+      <td>—</td><td>—</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>6. Key implementation concerns</h2>
+
+<h3>6.1 Saving — "Zapomni si" (spec §6.1)</h3>
+<ul>
+  <li>Click &rarr; <code>generalStore.saveGeneral(state.general)</code> picks the six whitelisted fields and
+    calls <code>storage.writeRecord("general", 1, snapshot)</code>, overwriting any prior Glava record.</li>
+  <li><strong>No validation gate</strong> — the snapshot is saved as-is regardless of validity/completeness.
+    Validation is never invoked on the save path.</li>
+  <li>On success (<code>true</code>): show the green check next to "Zapomni si" for 3 s; enable "Pozabi".</li>
+  <li>On failure (<code>false</code>): show the red indicator + "Poskusite znova." next to "Zapomni si" for
+    3 s; write nothing; leave "Pozabi" state unchanged.</li>
+</ul>
+
+<h3>6.2 Forgetting — "Pozabi" (spec §6.2)</h3>
+<ul>
+  <li>Click &rarr; <code>generalStore.forgetGeneral()</code> &rarr;
+    <code>storage.removeRecord("general")</code>. Form values in memory are <strong>not</strong> altered.</li>
+  <li>On success: green check next to "Pozabi" for 3 s; disable "Pozabi".</li>
+  <li>On failure: red indicator + "Poskusite znova." next to "Pozabi" for 3 s; treat record as still present;
+    keep "Pozabi" enabled.</li>
+  <li>Disabled state makes the button unreachable when nothing is saved; a stray call is a harmless no-op
+    (spec §8).</li>
+</ul>
+
+<h3>6.3 "Pozabi" enabled/disabled (spec §6.3, §6.5)</h3>
+<ul>
+  <li>Computed from <code>generalStore.hasSavedGeneral()</code> at mount, and updated after every
+    <em>successful</em> save (&rarr; enabled) / <em>successful</em> remove (&rarr; disabled). A failed action
+    does not change it.</li>
+  <li>Disabled = the native <code>disabled</code> attribute (functional) plus <code>:disabled</code> CSS
+    (visual), satisfying "including visually."</li>
+</ul>
+
+<h3>6.4 Auto-restore + touched-on-load (spec §6.4, §8)</h3>
+<p>Bootstrap order in <code>main.js</code> (before the general view is built):</p>
+<pre>const state = createState();
+const restored = loadGeneral();            // {…}|null, never throws
+if (restored) updateGeneral(state, restored);   // overlay onto defaults
+const generalView = renderGeneral(generalContainer, state);   // builds prefilled
+…
+if (restored) generalView.revealErrors();  // §6.4: restored fields already "touched"</pre>
+<ul>
+  <li><strong>Reusing <code>revealErrors()</code></strong> is the whole trick: it marks the four validated
+    general fields touched and re-runs <code>validateGeneral</code>, so any stale/invalid restored value
+    surfaces its error immediately — without adding any parameter to <code>renderGeneral</code> or altering
+    the quiet-until-touched path for subsequently typed input. When nothing is restored,
+    <code>revealErrors()</code> is not called, so a fresh form stays quiet as today.</li>
+  <li><strong>Tolerant read</strong> (<code>generalStore.loadGeneral</code>): overlay only recognized
+    whitelist keys onto <code>createState().general</code> defaults; missing fields keep their default;
+    unknown fields are ignored; any envelope <code>version</code> is accepted (only v1 exists) with the same
+    whitelist filter. Corrupt/absent/unparseable &rarr; <code>null</code> &rarr; treated as "nothing saved,"
+    normal defaults, "Pozabi" disabled. <strong>Auto-restore never throws and never blocks startup.</strong></li>
+  <li>KIR/KPR are untouched — they always start empty.</li>
+</ul>
+
+<h3>6.5 Feedback indicators &amp; timers (spec §5, §6.5, §6.6)</h3>
+<ul>
+  <li>Each button has its <strong>own feedback slot</strong> adjacent to it; only the clicked button's slot
+    shows, reflecting the latest outcome.</li>
+  <li><strong>Success:</strong> green check + accessible Slovenian text — <em>"Shranjeno"</em> (save) /
+    <em>"Pozabljeno"</em> (remove). <strong>Failure:</strong> red circle-with-X + visible text
+    <strong>"Poskusite znova."</strong></li>
+  <li>Feedback element is a live region (<code>role="status"</code>) with the Slovenian text as content so
+    meaning is not color/icon-only; the icon glyph is <code>aria-hidden</code>.</li>
+  <li><strong>3 s transient:</strong> a per-controls <code>setTimeout(…, 3000)</code> hides the slot; a fresh
+    click <code>clearTimeout</code>s the pending timer and restarts it for the latest outcome (spec §6.6
+    reset behavior). The failed state auto-returns to whichever prior state applies, since a failed action
+    left storage unchanged (spec §6.5).</li>
+</ul>
+
+<h3>6.6 Error handling (spec §8)</h3>
+<table>
+  <thead><tr><th>Failure</th><th>Handling</th></tr></thead>
+  <tbody>
+    <tr><td><code>localStorage</code> property read throws / storage disabled</td><td><code>storage</code> guards the access; read &rarr; <code>null</code>, write/remove &rarr; <code>false</code>.</td></tr>
+    <tr><td><code>setItem</code> throws (quota, private mode)</td><td><code>writeRecord</code> &rarr; <code>false</code> &rarr; red indicator; nothing written; memory untouched.</td></tr>
+    <tr><td><code>removeItem</code> throws</td><td><code>removeRecord</code> &rarr; <code>false</code> &rarr; red indicator; "Pozabi" stays enabled.</td></tr>
+    <tr><td>Stored JSON corrupt/unparseable</td><td><code>readRecord</code> catches the parse error &rarr; <code>null</code> &rarr; treated as nothing saved.</td></tr>
+    <tr><td>Older/unknown record shape</td><td>Whitelist-filter recognized fields; default the rest; ignore unknowns (§6.4).</td></tr>
+  </tbody>
+</table>
+
+<h3>6.7 Testing</h3>
+<ul>
+  <li><strong><code>storage.js</code> unit tests</strong> (Node runner, injected fake backend): namespacing
+    (<code>keyFor</code>), envelope round-trip, tolerant read (missing key &amp; corrupt JSON &rarr;
+    <code>null</code>), and failure paths via a throwing fake (<code>setItem</code>/<code>removeItem</code>
+    /property-access &rarr; <code>false</code>/<code>null</code>).</li>
+  <li><strong><code>generalStore.js</code> unit tests:</strong> whitelist filtering on save; defaults
+    fallback for missing fields; ignore unknown fields; save/load round-trip;
+    <code>hasSavedGeneral</code> true/false; forget clears.</li>
+  <li><strong>Smoke test</strong> (<code>.claude/skills/run/</code>, headless Chrome over CDP) for the
+    DOM/timer/localStorage paths the unit tests can't reach: save &rarr; "Pozabi" enables &amp; green check
+    appears; reload &rarr; form prefilled &amp; restored-invalid errors shown immediately; forget &rarr;
+    "Pozabi" disables. The existing <code>integration.test.js</code> (serialize pipeline) is unaffected —
+    persistence is orthogonal to the JSON output and is not added there.</li>
+</ul>
+
+<h2>7. Build / file structure</h2>
+<pre>src/
+├── index.html            EDIT  + &lt;div id="general-persist"&gt; in #general-section
+├── css/
+│   └── styles.css        EDIT  + .persist-row/.persist-button/.persist-feedback + :disabled
+└── js/
+    ├── main.js           EDIT  auto-restore before render; mount persist controls
+    ├── storage.js        NEW   generic namespaced envelope read/write/remove (DOM-free)
+    ├── generalStore.js   NEW   Glava domain glue: whitelist + save/load/forget/has (DOM-free)
+    ├── state.js          —     unchanged (updateGeneral reused for restore)
+    ├── validate.js       —     unchanged (single source of truth)
+    └── view/
+        ├── general.js        —   unchanged (revealErrors reused for touched-on-load)
+        └── persistControls.js NEW "Zapomni si"/"Pozabi" row + feedback timers (DOM)</pre>
+
+<h3>7.1 Rough sequencing</h3>
+<ol>
+  <li><code>storage.js</code> (generic layer) with unit tests — the reusable seam first.</li>
+  <li><code>generalStore.js</code> (whitelist + defaults + envelope version) with unit tests.</li>
+  <li><code>index.html</code> mount point + <code>styles.css</code> persist-row styling (from existing tokens).</li>
+  <li><code>view/persistControls.js</code> — buttons, enable/disable, feedback timers.</li>
+  <li><code>main.js</code> wiring — auto-restore + <code>revealErrors()</code> + mount controls.</li>
+  <li>Smoke pass over the §6.4/§6.5/§6.6 flows (save, reload-prefill, forget, failure indicator).</li>
+</ol>
+
+<h2>8. Assumptions and out-of-scope</h2>
+
+<div class="flag">
+  <strong>Label to confirm at UI stage (not code-baked):</strong> the two button labels
+  ("Zapomni si" / "Pozabi") and the failure text ("Poskusite znova.") are <strong>fixed</strong> by spec
+  §5. Only the <em>accessible success wording</em> — proposed <em>"Shranjeno"</em> / <em>"Pozabljeno"</em>
+  — is marked adjustable by spec §6.6; this plan carries them as the working values, to be confirmed rather
+  than silently locked.
+</div>
+
+<h3>Assumptions</h3>
+<ul>
+  <li>Target is current evergreen browsers with <code>localStorage</code> available in the normal case
+    (failure modes are handled per §6.6, not assumed away).</li>
+  <li>Namespace token <code>ddvReporter</code> and domain name <code>general</code> are app-internal
+    identifiers (not user-facing, so English per convention); future domains follow
+    <code>ddvReporter.&lt;domain&gt;</code>.</li>
+  <li>The persist row mounts in a dedicated <code>#general-persist</code> div <em>inside</em> the general
+    <code>&lt;section&gt;</code> and below <code>#general-content</code>, so <code>general.js</code>'s
+    <code>replaceChildren()</code> (scoped to <code>#general-content</code>) never disturbs it.</li>
+  <li>Stored values keep the same JS types they hold in <code>state.general</code> (strings and booleans),
+    round-tripping cleanly through JSON; no numeric/type coercion beyond whitelist filtering is required.</li>
+</ul>
+
+<h3>Out of scope (restating spec §3 / §9 as it constrains this design)</h3>
+<ul>
+  <li>Persisting <strong>KIR / KPR</strong> or anything beyond the six Glava fields.</li>
+  <li>Cross-device / cross-browser <strong>sync</strong>, cloud/account storage, any server component.</li>
+  <li><strong>Encryption</strong> of stored data; multiple named/saved profiles; a save history.</li>
+  <li><strong>Undo</strong> of "Pozabi"; <strong>export/import</strong> of the stored blob or any user-visible
+    view of it.</li>
+  <li>Any change to the <code>DDV_KIR_KPR</code> output, the download gate, or FURS validation rules.</li>
+</ul>
+
+</body>
+</html>

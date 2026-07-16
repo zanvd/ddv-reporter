@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DDV Reporter — Persist General (Glava) Data Specification</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --muted: #5a5a5a;
+    --accent: #0b5c8a;
+    --border: #d5d9dd;
+    --bg-soft: #f6f8fa;
+    --code-bg: #eef1f4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    line-height: 1.55;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 5rem;
+  }
+  h1 { font-size: 1.8rem; line-height: 1.2; margin: 0 0 0.4rem; }
+  h2 {
+    font-size: 1.25rem;
+    margin: 2.4rem 0 0.8rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 2px solid var(--border);
+  }
+  h3 { font-size: 1.05rem; margin: 1.6rem 0 0.6rem; color: var(--accent); }
+  p, li { font-size: 0.95rem; }
+  code {
+    background: var(--code-bg);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85em;
+  }
+  pre {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.65rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--bg-soft); font-weight: 600; }
+  tr:nth-child(even) td { background: #fbfcfd; }
+  .meta {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin: 0.15rem 0;
+  }
+  .meta strong { color: var(--fg); }
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--bg-soft);
+    padding: 0.7rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.9rem;
+  }
+  .changelog {
+    border-left: 4px solid #b8860b;
+    background: #fdf9ef;
+    padding: 0.6rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.88rem;
+  }
+  ul { padding-left: 1.3rem; }
+  a { color: var(--accent); word-break: break-word; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  .sources li { margin-bottom: 0.6rem; }
+</style>
+</head>
+<body>
+
+<h1>DDV Reporter — Persist General (Glava) Data Specification</h1>
+<p class="meta"><strong>Version:</strong> 1.1 (draft for implementation planning)</p>
+<p class="meta"><strong>Date:</strong> 2026-07-16</p>
+<p class="meta"><strong>Status:</strong> Confirmed — ready for implementation planning</p>
+<p class="meta"><strong>Scope:</strong> Product / requirements only. No technical, architectural, or implementation decisions.</p>
+<p class="meta"><strong>Builds on:</strong> Spec 0001 (VAT records KIR/KPR JSON export) — the Glava field
+  definitions, Slovenian "Naziv polja" labels, and validation model referenced here are defined there.</p>
+
+<div class="changelog">
+  <strong>Changelog:</strong> v1.1 — resolved the former §11 open question: added the <strong>failure
+  feedback state</strong> (red circle-with-X + "Poskusite znova.", 3 s, mirroring the success checkmark) as a
+  third feedback variant on both buttons (§5, §6.1, §6.2, §6.6), added a fifth "save/remove failed" row to
+  the states table (§6.5), and cleared §11. v1.0 — initial draft.
+</div>
+
+<div class="callout">
+  <strong>Not a VAT rule.</strong> This feature is <em>local persistence and UI behavior</em> only. It
+  introduces no new tax logic and changes nothing about how DDV is reported, calculated, or validated
+  against FURS rules. Consequently there is no FURS / ZDDV-1 dependency to research or cite for the
+  behavior described here (see §10). All existing FURS field definitions and validation rules from spec
+  0001 remain unchanged and continue to apply to the Glava fields.
+</div>
+
+<h2>1. Summary</h2>
+<p>
+  Let the user <strong>persist the general-data section (Glava) only</strong> — taxpayer number and
+  reporting period selection plus the two header flags — in the browser's <strong>local storage</strong>,
+  via two explicit actions: <strong>"Zapomni si"</strong> (save) and <strong>"Pozabi"</strong> (forget).
+  When saved Glava data exists, it is <strong>auto-restored</strong> into the form the next time the app
+  is opened. This removes the friction of re-entering the same taxpayer/period header every session. Fully
+  client-side; nothing leaves the browser.
+</p>
+
+<h2>2. Background / motivation</h2>
+<p>
+  The Glava header (taxpayer number, reporting period, and the <code>VRACILO</code> / <code>ODBDELEZ</code>
+  flags — spec 0001 §5) is largely stable for a given VAT payer: the taxpayer number never changes, and the
+  period/flags change predictably between filings. Re-typing this on every visit is repetitive friction,
+  especially since the base application intentionally has <strong>no session persistence</strong> (spec 0001
+  §9). This feature adds an <em>opt-in, local-only</em> way to remember the Glava section so it is prefilled
+  on the next visit, while keeping the "nothing leaves the browser" guarantee intact.
+</p>
+
+<h2>3. Scope</h2>
+<h3>In scope</h3>
+<ul>
+  <li>A <strong>"Zapomni si"</strong> action that saves the current Glava-section values to local storage
+    (§5, §6).</li>
+  <li>A <strong>"Pozabi"</strong> action that removes the saved Glava-section values from local storage
+    (§5, §6).</li>
+  <li><strong>Auto-restore on open:</strong> if saved Glava data exists in local storage when the app
+    loads, the form is prefilled from it automatically — no separate "load" action (§6).</li>
+  <li><strong>Disabled "Pozabi" when nothing is saved</strong>, including a visually disabled state (§6).</li>
+  <li><strong>Green-checkmark confirmation</strong> next to the just-clicked button after a successful save
+    or a successful remove, visible for 3 seconds, then hidden (§6).</li>
+  <li><strong>Red failure indicator</strong> next to the just-clicked button when a save or remove fails,
+    visible for 3 seconds, then hidden (§6).</li>
+  <li>A <strong>forward-compatibility constraint</strong> binding the storage design so that later features
+    can persist additional, independent data domains alongside Glava (§7).</li>
+</ul>
+<h3>Out of scope</h3>
+<ul>
+  <li><strong>Persisting KIR / KPR entries</strong> — this feature is <strong>Glava-only</strong>. The
+    charged/deducted ledger lists are never saved or restored here.</li>
+  <li>Any <strong>server-side or account-based</strong> persistence, and any <strong>cross-device or
+    cross-browser sync</strong> — storage is confined to the single browser's local storage.</li>
+  <li><strong>Export / import</strong> of the saved data as a file, or any user-visible representation of the
+    stored blob.</li>
+  <li><strong>Encryption</strong> of the stored data, multiple named/saved profiles, and any
+    <strong>undo</strong> of "Pozabi".</li>
+  <li>Any change to the <strong>DDV_KIR_KPR JSON output</strong>, the download flow, or the FURS validation
+    rules (spec 0001 §7, §8).</li>
+</ul>
+
+<h2>4. Persisted data set</h2>
+<p>
+  Exactly the six Glava fields are persisted — the full contents of the general section as defined in spec
+  0001 §5. Nothing else. The period type/unit/year are the application's own <em>input model</em> for
+  choosing the period; they are not FURS wire fields themselves (spec 0001 §5 derives
+  <code>OBDOBJE_OD</code> / <code>OBDOBJE_DO</code> / <code>OBDOBJE</code> from them). Only
+  <code>TaxPayerID</code>, <code>VRACILO</code>, and <code>ODBDELEZ</code> are FURS wire identifiers.
+</p>
+<table>
+  <thead>
+    <tr><th>User-facing label (Slovenian)</th><th>Internal state key</th><th>FURS wire field</th><th>Persisted value</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Davčna številka zavezanca</td><td><code>taxPayerID</code></td><td><code>TaxPayerID</code></td><td>String as entered (may be empty/partial — see §6, save-as-is)</td></tr>
+    <tr><td>Vrsta obdobja poročanja</td><td><code>periodType</code></td><td>—</td><td><code>"monthly"</code> or <code>"quarterly"</code></td></tr>
+    <tr><td>Mesec / Četrtletje</td><td><code>periodUnit</code></td><td>—</td><td>Selected unit, or empty if none chosen</td></tr>
+    <tr><td>Leto</td><td><code>periodYear</code></td><td>—</td><td>String as entered (may be empty/partial)</td></tr>
+    <tr><td>Zahtevam vračilo presežka DDV</td><td><code>vracilo</code></td><td><code>VRACILO</code></td><td>Boolean</td></tr>
+    <tr><td>Izračunavam odbitni delež</td><td><code>odbdelez</code></td><td><code>ODBDELEZ</code></td><td>Boolean</td></tr>
+  </tbody>
+</table>
+<p>
+  A single "Zapomni si" saves a <strong>snapshot of all six fields together</strong> as one Glava record.
+  There is no per-field persistence and no partial save of a subset.
+</p>
+
+<h2>5. User-facing controls &amp; labels</h2>
+<p>All user-facing text is <strong>Slovenian</strong>, consistent with project convention and spec 0001 §3.</p>
+<table>
+  <thead>
+    <tr><th>Control</th><th>Label (Slovenian) — fixed</th><th>Purpose</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Save button</td><td><strong>Zapomni si</strong></td><td>Save current Glava snapshot to local storage.</td></tr>
+    <tr><td>Forget button</td><td><strong>Pozabi</strong></td><td>Remove the saved Glava snapshot from local storage.</td></tr>
+    <tr><td>Success indicator</td><td>Green checkmark (see §6 for accessible text)</td><td>Confirms a successful save or remove; shown next to the clicked button for 3 s.</td></tr>
+    <tr><td>Failure indicator</td><td>Red circle-with-X + "Poskusite znova."</td><td>Signals a failed save or remove (storage unavailable, quota, private mode); shown next to the clicked button for 3 s.</td></tr>
+  </tbody>
+</table>
+<h3>5.1 Placement (proposed)</h3>
+<p>
+  The two buttons sit in a <strong>new action row below the Glava field grid</strong>, separated from the
+  fields by a hairline rule consistent with the existing <code>.entry-card-header</code> rhythm. The buttons
+  <strong>reuse the application's existing button visual language verbatim</strong> — the established button
+  tokens/classes and the <code>--accent</code> / <code>--border</code> / <code>--bg-soft</code> palette
+  (spec 0001 styling; project CSS). The success and failure indicators reuse the existing status palette —
+  the success check in a green consistent with the app, the failure icon in a red consistent with the
+  existing <code>--error</code> token. <strong>No new visual language or bespoke component styles are
+  introduced.</strong> This placement/layout is a confirmed-reasonable proposal derived from the design
+  mockup; the fixed requirements below are not negotiable, but exact spacing/order within the row may be
+  refined during implementation planning without another spec revision.
+</p>
+<div class="callout">
+  <strong>Fixed requirements (non-negotiable):</strong> (1) the two button labels are exactly
+  <strong>"Zapomni si"</strong> and <strong>"Pozabi"</strong>; (2) "Pozabi" is disabled — including
+  visually — whenever no Glava data is currently saved; (3) after a successful save or remove, a green
+  checkmark appears next to the button just clicked, stays visible for <strong>3 seconds</strong>, then
+  disappears; (4) after a <em>failed</em> save or remove, a red circle-with-X icon plus the text
+  <strong>"Poskusite znova."</strong> appears next to the button just clicked, stays visible for
+  <strong>3 seconds</strong>, then disappears.
+</div>
+
+<h2>6. Behavior</h2>
+
+<h3>6.1 Saving — "Zapomni si"</h3>
+<ul>
+  <li>Clicking "Zapomni si" writes the current values of all six Glava fields (§4) to local storage as a
+    single Glava record, <strong>overwriting</strong> any previously saved Glava record.</li>
+  <li><strong>Save-as-is, no validation gate:</strong> the current Glava values are saved regardless of
+    whether they are valid or complete (e.g. an empty tax number, or no period unit chosen, is still saved).
+    Saving is a convenience snapshot, not a submission, so it is never blocked by validation.</li>
+  <li>On success, a green checkmark appears next to the "Zapomni si" button for 3 seconds, then disappears.</li>
+  <li>Because a save means data now exists in storage, the "Pozabi" button becomes <strong>enabled</strong>
+    immediately after a successful save (if it was disabled).</li>
+  <li>On failure (storage unavailable, quota exceeded, private-mode restrictions), the save does not happen:
+    the red failure indicator is shown instead (§6.6), no data is written, and the "Pozabi" enabled/disabled
+    state is unchanged.</li>
+</ul>
+
+<h3>6.2 Forgetting — "Pozabi"</h3>
+<ul>
+  <li>Clicking "Pozabi" removes the saved Glava record from local storage.</li>
+  <li>It does <strong>not</strong> clear or alter the values currently shown in the form; it only deletes
+    what is stored. (There is no undo — §3 Out of scope.)</li>
+  <li>On success, a green checkmark appears next to the "Pozabi" button for 3 seconds, then disappears.</li>
+  <li>Because storage is now empty, the "Pozabi" button becomes <strong>disabled</strong> (including
+    visually) immediately after a successful remove.</li>
+  <li>On failure (the removal could not be completed), the red failure indicator is shown instead (§6.6),
+    the stored record is treated as still present, and "Pozabi" remains enabled.</li>
+</ul>
+
+<h3>6.3 "Pozabi" enabled/disabled state</h3>
+<ul>
+  <li>"Pozabi" is <strong>enabled only when a saved Glava record currently exists</strong> in local storage;
+    otherwise it is disabled, both functionally and visually.</li>
+  <li>This state is evaluated on app open and updated after every successful save (→ enabled) and successful
+    remove (→ disabled). A <em>failed</em> save or remove does not change this state.</li>
+</ul>
+
+<h3>6.4 Auto-restore on open</h3>
+<ul>
+  <li>When the app loads, if a saved Glava record exists, the general-section form is
+    <strong>prefilled</strong> from it. If none exists, the form uses its normal defaults (spec 0001; app
+    default general state).</li>
+  <li>Auto-restore affects the <strong>Glava section only</strong>; KIR/KPR lists always start empty.</li>
+  <li><strong>Restored fields show validation errors immediately.</strong> Auto-restored Glava fields are
+    treated as <strong>already "touched"</strong>, so any values that fail validation surface their error on
+    open — a deliberate deviation from the app's normal "quiet until touched" rule (spec 0001 §7; project
+    validation UX), which applies to fresh user-typed input.
+    <br><em>Rationale:</em> a restored value can be stale or invalid (an old save, or a value that no longer
+    passes validation after a rule/schema change). Surfacing that immediately — rather than hiding it until
+    the user happens to touch that field — makes the problem visible and fixable at once. Validation itself
+    is unchanged: the existing single source of truth for field errors still decides what is valid; only the
+    <em>visibility</em> of those errors on restored fields differs.</li>
+</ul>
+
+<h3>6.5 The states (from the design mockup)</h3>
+<table>
+  <thead>
+    <tr><th>State</th><th>"Zapomni si"</th><th>"Pozabi"</th><th>Feedback indicator</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Nothing saved</td><td>Enabled</td><td>Disabled (visually)</td><td>None</td></tr>
+    <tr><td>Just saved</td><td>Enabled</td><td>Enabled</td><td>Green check next to "Zapomni si", 3 s</td></tr>
+    <tr><td>Saved &amp; idle</td><td>Enabled</td><td>Enabled</td><td>None</td></tr>
+    <tr><td>Just forgotten</td><td>Enabled</td><td>Disabled (visually)</td><td>Green check next to "Pozabi", 3 s</td></tr>
+    <tr><td>Save / remove failed</td><td>Enabled</td><td>Unchanged (per pre-action storage state)</td><td>Red circle-with-X + "Poskusite znova." next to the clicked button, 3 s</td></tr>
+  </tbody>
+</table>
+<p>
+  The "Save / remove failed" state is transient: after its 3 seconds elapse, the UI returns to whichever
+  prior state applies (Nothing saved / Saved &amp; idle), since a failed action leaves stored data
+  unchanged.
+</p>
+
+<h3>6.6 Feedback indicators (success &amp; failure)</h3>
+<ul>
+  <li>Both indicators occupy the <strong>same slot / placement</strong> next to the button that was just
+    clicked (§6.5), and share the same <strong>3-second transient behavior</strong> — appear on the action,
+    auto-hide after 3 seconds.</li>
+  <li><strong>Success:</strong> a <strong>green checkmark</strong> icon, shown after a successful save or a
+    successful remove.</li>
+  <li><strong>Failure:</strong> a <strong>red circle-with-X</strong> icon paired with the text
+    <strong>"Poskusite znova."</strong>, shown after a failed save or a failed remove.</li>
+  <li>Only one indicator is shown at a time per button, reflecting the most recent action. If a button is
+    clicked again before its 3 seconds elapse, the timer resets and the indicator reflects the latest
+    outcome (proposed handling; not a fixed requirement).</li>
+  <li>Each indicator carries an accessible text equivalent in Slovenian so meaning is not conveyed by color
+    or icon alone — proposed wording: <strong>"Shranjeno"</strong> (successful save),
+    <strong>"Pozabljeno"</strong> (successful remove); the failure indicator's <strong>"Poskusite
+    znova."</strong> already serves as its text. Final accessible wording may be adjusted in implementation
+    planning.</li>
+</ul>
+
+<h2>7. Forward-compatibility constraint</h2>
+<div class="callout">
+  <strong>Product-level requirement (binding on implementation planning).</strong> The user has flagged that
+  <em>future features may persist additional, independent kinds of data</em> to local storage. Glava is the
+  <strong>first of potentially several persisted data domains</strong>. The persistence scheme therefore
+  <strong>must be structured so that additional domains can be added alongside the Glava record without
+  migrating, reshaping, or overwriting existing stored data</strong>. Persisting Glava as a single flat blob
+  that a later feature would have to break apart or migrate away from is <strong>not acceptable</strong>.
+</div>
+<p>
+  This is a scope/forward-compatibility constraint, not an architecture decision. The concrete storage
+  key scheme, record shape, and versioning approach are <strong>deliberately left to implementation
+  planning</strong> (impl-planner) — this spec only requires that whatever scheme is chosen keeps distinct
+  data domains independently addressable and independently removable.
+</p>
+
+<h2>8. Edge cases</h2>
+<table>
+  <thead>
+    <tr><th>Case</th><th>Expected handling</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Local storage unavailable or writes rejected (private-mode restrictions, quota exceeded,
+        storage disabled)</td>
+      <td>The action fails <strong>safely</strong>: the app keeps working, form data in memory is
+        untouched, no data is written/removed, and the <strong>red failure indicator</strong> ("Poskusite
+        znova.", §6.6) is shown instead of the success checkmark. The "Pozabi" enabled/disabled state is
+        left unchanged.</td>
+    </tr>
+    <tr>
+      <td>Saved Glava record is missing, empty, corrupt, or unparseable on open</td>
+      <td>Treat as "nothing saved": the form uses normal defaults, and "Pozabi" is disabled. Auto-restore
+        must never break app startup.</td>
+    </tr>
+    <tr>
+      <td>Saved record was written by a different/older app version and some fields are missing or unknown</td>
+      <td>Restore whatever recognized Glava fields are present; fall back to defaults for any missing field.
+        Ignore unknown fields. A restored-but-invalid value still surfaces its error immediately (§6.4).</td>
+    </tr>
+    <tr>
+      <td>Restored values fail validation (stale save, changed rules)</td>
+      <td>Prefill them anyway and show their errors immediately (§6.4). The user corrects and may re-save.</td>
+    </tr>
+    <tr>
+      <td>"Pozabi" clicked while nothing is saved</td>
+      <td>Not reachable through the UI — the button is disabled in that state (§6.3). If it were somehow
+        triggered, it is a harmless no-op.</td>
+    </tr>
+    <tr>
+      <td>"Zapomni si" clicked repeatedly</td>
+      <td>Each click overwrites the prior saved Glava record with the current values; the indicator timer
+        resets to the latest action.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>9. Non-goals (explicitly deferred)</h2>
+<ul>
+  <li>Persisting <strong>KIR / KPR entries</strong> or any data beyond the six Glava fields.</li>
+  <li><strong>Cross-device / cross-browser sync</strong>, cloud/account storage, or any server component.</li>
+  <li><strong>Encryption</strong> of stored data.</li>
+  <li><strong>Multiple named/saved Glava profiles</strong> or a history of saves.</li>
+  <li><strong>Undo</strong> of "Pozabi".</li>
+  <li><strong>Export / import</strong> of the saved data as a file.</li>
+  <li>Any change to the DDV_KIR_KPR output, the download gate, or FURS validation rules.</li>
+</ul>
+
+<h2>10. References / notes</h2>
+<p>
+  This feature is <strong>local-storage persistence and UI behavior</strong> only. It has no dependency on
+  any FURS form, the ZDDV-1 / ZDDV-1O statute, the Pravilnik o izvajanju ZDDV-1, or any EU VAT rule, and it
+  does not change the DDV_KIR_KPR file, its fields, or its validation. Accordingly, <strong>no external
+  legal or regulatory sources apply to the behavior specified here</strong>, and none are cited — a
+  deliberate note, not an omission.
+</p>
+<p>The only relevant references are internal:</p>
+<ul>
+  <li><strong>Spec 0001 — VAT records KIR/KPR JSON export</strong> (<code>specs/0001-vat_records_kir_kpr_json_export.html</code>):
+    defines the Glava fields (§5), their Slovenian "Naziv polja" labels, and the validation model /
+    quiet-until-touched UX (§7) that this feature builds on and selectively deviates from (§6.4).</li>
+  <li><strong>Project conventions</strong> (repo-root <code>CLAUDE.md</code>): all user-facing text is
+    Slovenian; FURS wire-format identifiers (<code>TaxPayerID</code>, <code>VRACILO</code>,
+    <code>ODBDELEZ</code>) stay verbatim; validation remains the single source of truth for field errors.</li>
+</ul>
+
+<h2>11. Open questions</h2>
+<p>None. All items are resolved; the failure-feedback behavior (§6.6) closed the last one.</p>
+
+</body>
+</html>
