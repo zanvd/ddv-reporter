@@ -1,0 +1,9 @@
+{
+  "name": "ddv-reporter",
+  "private": true,
+  "type": "module",
+  "description": "Dev-only test tooling config for the DDV Reporter pure logic modules. Not loaded by the app itself (see index.html, which is plain vanilla JS/HTML/CSS with no build step).",
+  "scripts": {
+    "test": "node --test"
+  }
+}
