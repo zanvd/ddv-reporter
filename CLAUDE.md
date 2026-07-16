@@ -2,8 +2,11 @@
 
 A standalone, fully client-side web app that lets a Slovenian VAT payer enter
 their VAT data and download a FURS-formatted **`DDV_KIR_KPR`** JSON file (the
-KIR/KPR evidence records — *not* the DDV-O return). No backend, no persistence,
-nothing leaves the browser.
+KIR/KPR evidence records — *not* the DDV-O return). No backend; any persistence
+is local-only (browser storage) — nothing leaves the browser.
+
+**Production:** https://zanvd.github.io/ddv-reporter/ (deployed via the GitHub
+Pages workflow on push to `master`).
 
 ## Workflow pipeline
 
