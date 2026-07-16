@@ -64,10 +64,13 @@ Show the user the code you wrote for this chunk, with a short description and ex
 
 **7. Regression-test everything so far.**
 Once the chunk is approved, run the full test suite for everything built to date with `Bash`.
-- If it passes, move on to the next chunk (back to step 4).
+- If it passes, move on to step 8.
 - If it fails, fix the regression and re-test. If you cannot resolve it after **3 attempts**, stop and consult the user as in step 5.
 
-**8. Wrap up.**
+**8. Commit the chunk.**
+Once the chunk is approved and the regression suite passes, commit it with `Bash` before moving on — one commit per approved chunk, never batched with another chunk and never made before approval. Stage only the files that belong to this chunk, and write the message in the repo's Conventional-Commits style (`type: subject`, imperative, lowercase after the colon, no trailing period — see `CLAUDE.md`). Then return to step 4 for the next chunk, or step 9 if this was the last one.
+
+**9. Wrap up.**
 When all chunks are done and the full suite passes, tell the user the build is complete and surface any **decisions worth considering** — trade-offs you made, follow-ups, technical debt, edge cases the plan left open, or improvements that were out of scope for this build. Present these as considerations for the user, not as changes you will make unprompted.
 
 ## Style notes
