@@ -1,0 +1,425 @@
+{
+  "type": "object",
+  "required": [
+    "DDV_KIR_KPR"
+  ],
+  "properties": {
+    "DDV_KIR_KPR": {
+      "$ref": "#/definitions/DDV_KIR_KPR"
+    }
+  },
+  "definitions": {
+    "nacinType": {
+      "enum": [
+        "1",
+        "2",
+        "3"
+      ],
+      "type": "string"
+    },
+    "obravnavaType": {
+      "enum": [
+        "1",
+        "2",
+        "3"
+      ],
+      "type": "string"
+    },
+    "text250Type": {
+      "maxLength": 250,
+      "type": "string"
+    },
+    "countryCodeType": {
+      "minLength": 2,
+      "maxLength": 2,
+      "type": "string"
+    },
+    "amountType": {
+      "minimum": -5000000000,
+      "exclusiveMinimum": true,
+      "maximum": 5000000000,
+      "exclusiveMaximum": true,
+      "type": "number"
+    },
+    "taxPayerIdType": {
+      "pattern": "^[0-9]{8}$",
+      "type": "string",
+      "minimum": 0,
+      "exclusiveMinimum": true
+    },
+    "obdobjeType": {
+      "pattern": "^[0-9]{4}$",
+      "type": "string"
+    },
+    "mmmmllllType": {
+      "pattern": "^[0-9]{8}$",
+      "type": "string"
+    },
+    "DDV_KIR_KPR": {
+      "required": [
+        "Glava"
+      ],
+      "type": "object",
+      "properties": {
+        "Glava": {
+          "$ref": "#/definitions/Glava"
+        },
+        "Lista_KIR": {
+          "$ref": "#/definitions/Lista_KIR"
+        },
+        "Lista_KPR": {
+          "$ref": "#/definitions/Lista_KPR"
+        }
+      }
+    },
+    "Glava": {
+      "required": [
+        "TaxPayerID",
+        "OBDOBJE_OD",
+        "OBDOBJE_DO",
+        "KIR",
+        "KPR",
+        "ODBDELEZ"
+      ],
+      "type": "object",
+      "properties": {
+        "TaxPayerID": {
+          "$ref": "#/definitions/taxPayerIdType"
+        },
+        "TUJEC1": {
+          "$ref": "#/definitions/countryCodeType"
+        },
+        "TUJEC2": {
+          "type": "string"
+        },
+        "OBDOBJE_OD": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+            },
+            {
+              "type": "string",
+              "format": "date-time"
+            }
+          ]
+        },
+        "OBDOBJE_DO": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+            },
+            {
+              "type": "string",
+              "format": "date-time"
+            }
+          ]
+        },
+        "KIR": {
+          "type": "boolean"
+        },
+        "KPR": {
+          "type": "boolean"
+        },
+        "VRACILO": {
+          "type": "boolean"
+        },
+        "ODBDELEZ": {
+          "type": "boolean"
+        },
+        "NACIN": {
+          "$ref": "#/definitions/nacinType"
+        },
+        "INSPOS": {
+          "type": "boolean"
+        },
+        "PREDLODO": {
+          "type": "boolean"
+        },
+        "OPOMBA": {
+          "$ref": "#/definitions/text250Type"
+        }
+      }
+    },
+    "Lista_KIR": {
+      "type": "object",
+      "properties": {
+        "KIR": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/KIR"
+          },
+          "minItems": 0
+        }
+      }
+    },
+    "Lista_KPR": {
+      "type": "object",
+      "properties": {
+        "KPR": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/KPR"
+          },
+          "minItems": 0
+        }
+      }
+    },
+    "KIR": {
+      "required": [
+        "ZAPST",
+        "OBDOBJE",
+        "P2",
+        "P3",
+        "P4",
+        "OBRAVNAVA"
+      ],
+      "type": "object",
+      "properties": {
+        "ZAPST": {
+          "type": "integer"
+        },
+        "OBDOBJE": {
+          "$ref": "#/definitions/obdobjeType"
+        },
+        "P2": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+            },
+            {
+              "type": "string",
+              "format": "date-time"
+            }
+          ]
+        },
+        "P3": {
+          "$ref": "#/definitions/text250Type"
+        },
+        "P4": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+            },
+            {
+              "type": "string",
+              "format": "date-time"
+            }
+          ]
+        },
+        "P5": {
+          "$ref": "#/definitions/text250Type"
+        },
+        "P6": {
+          "$ref": "#/definitions/countryCodeType"
+        },
+        "P7": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P8": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P9": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P10": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P11": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P12": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P13": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P14": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P15": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P16": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P17": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P18": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P19": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P20": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P21": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P22": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P23": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P24": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P25": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P26": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P27": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P28": {
+          "$ref": "#/definitions/text250Type"
+        },
+        "OBRAVNAVA": {
+          "$ref": "#/definitions/obravnavaType"
+        },
+        "OBDOBJE88": {
+          "$ref": "#/definitions/mmmmllllType"
+        },
+        "DAVEK88": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P6DS": {
+          "type": "string"
+        }
+      }
+    },
+    "KPR": {
+      "required": [
+        "ZAPST",
+        "OBDOBJE",
+        "P2",
+        "P3",
+        "P4",
+        "P5",
+        "P6",
+        "P7",
+        "OBRAVNAVA",
+        "P7DS"
+      ],
+      "type": "object",
+      "properties": {
+        "ZAPST": {
+          "type": "integer"
+        },
+        "OBDOBJE": {
+          "$ref": "#/definitions/obdobjeType"
+        },
+        "P2": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+            },
+            {
+              "type": "string",
+              "format": "date-time"
+            }
+          ]
+        },
+        "P3": {
+          "$ref": "#/definitions/text250Type"
+        },
+        "P4": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+            },
+            {
+              "type": "string",
+              "format": "date-time"
+            }
+          ]
+        },
+        "P5": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+            },
+            {
+              "type": "string",
+              "format": "date-time"
+            }
+          ]
+        },
+        "P6": {
+          "$ref": "#/definitions/text250Type"
+        },
+        "P7": {
+          "$ref": "#/definitions/countryCodeType"
+        },
+        "P8": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P9": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P10": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P11": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P12": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P13": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P14": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P15": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P16": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P17": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P18": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P19": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P20": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P21": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P22": {
+          "$ref": "#/definitions/text250Type"
+        },
+        "OBRAVNAVA": {
+          "$ref": "#/definitions/obravnavaType"
+        },
+        "OBDOBJE88": {
+          "$ref": "#/definitions/mmmmllllType"
+        },
+        "DAVEK88": {
+          "$ref": "#/definitions/amountType"
+        },
+        "P7DS": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
