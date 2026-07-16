@@ -5,6 +5,8 @@ evidence records. You enter your issued (KIR) and received (KPR) invoice data in
 a form and download a FURS-formatted `DDV_KIR_KPR` JSON file. Everything runs in
 the browser; no data leaves your machine and there is no backend.
 
+Live version is available at: https://zanvd.github.io/ddv-reporter/
+
 ## Usage
 
 The app is plain HTML/CSS/JavaScript with no build step. Because it uses ES
