@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DDV Poročilo</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<main>
+  <h1>DDV Poročilo</h1>
+  <p class="app-intro">
+    Vnesite podatke evidence obračunanega DDV (izdani računi) in evidence odbitka DDV
+    (prejeti računi) ter jih izvozite v datoteko JSON za oddajo na FURS.
+  </p>
+
+  <section id="general-section" aria-labelledby="general-heading">
+    <h2 id="general-heading">Glava</h2>
+    <div id="general-content"><!-- Rendered by js/view/general.js --></div>
+  </section>
+
+  <section id="kir-section" aria-labelledby="kir-heading">
+    <h2 id="kir-heading">Izdani računi (KIR)</h2>
+    <div id="kir-content"><!-- Rendered by js/view/kirList.js --></div>
+  </section>
+
+  <section id="kpr-section" aria-labelledby="kpr-heading">
+    <h2 id="kpr-heading">Prejeti računi (KPR)</h2>
+    <div id="kpr-content"><!-- Rendered by js/view/kprList.js --></div>
+  </section>
+
+  <div id="download-section">
+    <button type="button" id="download-button" class="download-button">Prenesi JSON</button>
+    <p id="download-message" class="field-error" role="alert"></p>
+  </div>
+</main>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
