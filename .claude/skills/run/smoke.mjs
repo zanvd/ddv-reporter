@@ -238,6 +238,33 @@ async function main() {
   check('banner auto-cleared once valid', (await dlMsg()) === '');
   await shot('03-general-filled');
 
+  // 3b. Persist controls (Glava save/forget) — R1 position stability,
+  // R3 last-action-wins in the single shared feedback slot (spec 0005)
+  const persistSaveButton = '#general-persist .persist-button:not(.forget)';
+  const persistForgetButton = '#general-persist .persist-button.forget';
+  const forgetLeft = () => evalJs(`document.querySelector('${persistForgetButton}').getBoundingClientRect().left`);
+  const persistFeedbackText = () => evalJs(`document.querySelector('#general-persist .persist-feedback-text')?.textContent`);
+  const persistFeedbackVisible = () => evalJs(`!document.querySelector('#general-persist .persist-feedback')?.hidden`);
+  const persistFeedbackCount = () => evalJs(`document.querySelectorAll('#general-persist .persist-feedback').length`);
+
+  check('single shared feedback slot in the persist row (not one per button)', (await persistFeedbackCount()) === 1);
+
+  const forgetLeftBefore = await forgetLeft();
+  await click(persistSaveButton);
+  await sleep(150);
+  check('save shows the shared feedback message',
+    (await persistFeedbackVisible()) && (await persistFeedbackText()) === 'Shranjeno');
+  check('"Pozabi" position unchanged while the shared message is visible (R1)',
+    (await forgetLeft()) === forgetLeftBefore);
+
+  await click(persistForgetButton);
+  await sleep(150);
+  check('forget immediately replaces the message with the latest outcome (R3)',
+    (await persistFeedbackText()) === 'Pozabljeno');
+  check('still exactly one visible feedback slot after replacement',
+    (await persistFeedbackCount()) === 1 && (await persistFeedbackVisible()));
+  check('"Pozabi" position still unchanged after the replacement (R1)', (await forgetLeft()) === forgetLeftBefore);
+
   // 4. Blank KIR row + Download -> reveals that row's errors
   await click('#kir-content .add-entry-button');
   await waitFor(`!!document.querySelector('#kir-content .entry-card')`, 'KIR row added');
