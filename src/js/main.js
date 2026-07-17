@@ -14,6 +14,7 @@ import { renderKirList } from './view/kirList.js';
 import { renderKprList } from './view/kprList.js';
 import { renderPersistControls } from './view/persistControls.js';
 import { initTabs } from './view/tabs.js';
+import { initThemeToggle } from './view/themeToggle.js';
 
 const state = createState();
 
@@ -48,6 +49,7 @@ if (restoredGeneral) generalView.revealErrors();
 renderPersistControls(generalPersistContainer, state);
 
 initTabs(document.querySelector('[role="tablist"]'));
+initThemeToggle(document.getElementById('theme-toggle'));
 
 const downloadButton = document.getElementById('download-button');
 const downloadMessage = document.getElementById('download-message');

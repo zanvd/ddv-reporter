@@ -160,6 +160,66 @@ async function main() {
   check('ArrowLeft moves focus back to tab-porocilo', (await evalJs(`document.activeElement.id`)) === 'tab-porocilo');
   check('ArrowLeft shows the Poročilo panel', await evalJs(`!document.getElementById('panel-porocilo').hidden`));
 
+  // 1f. Theme toggle — default resolution, click behavior, icon/label swap
+  const themeAttr = () => evalJs(`document.documentElement.getAttribute('data-theme')`);
+  const toggleAriaLabel = () => evalJs(`document.getElementById('theme-toggle').getAttribute('aria-label')`);
+  const iconVisible = (cls) => evalJs(`getComputedStyle(document.querySelector('.${cls}')).display !== 'none'`);
+  const THEME_LABEL = { light: 'Preklopi na temni način', dark: 'Preklopi na svetli način' };
+
+  const initialTheme = await themeAttr();
+  check('data-theme resolves to light or dark on load', initialTheme === 'light' || initialTheme === 'dark');
+  check('theme-toggle aria-label matches the resolved theme', (await toggleAriaLabel()) === THEME_LABEL[initialTheme]);
+  check('toggle icon matches the resolved theme',
+    initialTheme === 'light'
+      ? (await iconVisible('icon-sun')) && !(await iconVisible('icon-moon'))
+      : (await iconVisible('icon-moon')) && !(await iconVisible('icon-sun')));
+
+  await click('#theme-toggle');
+  await sleep(150);
+  const otherTheme = initialTheme === 'light' ? 'dark' : 'light';
+  check('clicking the toggle flips data-theme', (await themeAttr()) === otherTheme);
+  check('toggle icon swaps to match the new theme',
+    otherTheme === 'light'
+      ? (await iconVisible('icon-sun')) && !(await iconVisible('icon-moon'))
+      : (await iconVisible('icon-moon')) && !(await iconVisible('icon-sun')));
+  check("aria-label updates to the new theme's destination action", (await toggleAriaLabel()) === THEME_LABEL[otherTheme]);
+  await shot('01f-theme-toggled');
+
+  await click('#theme-toggle'); // back to the original theme
+  await sleep(150);
+  check('toggling again returns to the original theme', (await themeAttr()) === initialTheme);
+
+  // Keyboard operability + visible focus indicator (spec §8)
+  await evalJs(`document.getElementById('theme-toggle').focus()`);
+  check('theme-toggle is keyboard-focusable', (await evalJs(`document.activeElement.id`)) === 'theme-toggle');
+  check('theme-toggle shows a focus outline when focused',
+    (await evalJs(`getComputedStyle(document.getElementById('theme-toggle')).outlineStyle`)) !== 'none');
+
+  // State preservation across a toggle taken mid data-entry (spec §5, §9):
+  // an entered value, a revealed error, and the active tab must all survive.
+  await setInput('#tax-payer-id', '123'); // touched + invalid -> reveals its error immediately
+  await sleep(150);
+  const errorBeforeToggle = await evalJs(`document.getElementById('tax-payer-id-error').textContent`);
+  check('an invalid touched field reveals its error before toggling', errorBeforeToggle.length > 0);
+  await click('#tab-pomoc');
+  await sleep(150);
+  await click('#theme-toggle');
+  await sleep(150);
+  await click('#tab-porocilo');
+  await sleep(150);
+  check('entered value survives a theme toggle taken mid data-entry',
+    (await evalJs(`document.getElementById('tax-payer-id').value`)) === '123');
+  check('the active tab survives a theme toggle',
+    (await evalJs(`document.getElementById('tab-porocilo').getAttribute('aria-selected')`)) === 'true');
+  check('the revealed error survives a theme toggle',
+    (await evalJs(`document.getElementById('tax-payer-id-error').textContent`)) === errorBeforeToggle);
+
+  await click('#theme-toggle'); // restore the original theme once more
+  await sleep(150);
+  check('theme is back to the original after the round trip', (await themeAttr()) === initialTheme);
+  // Reset before the Download-gate checks below, which expect a blank general section.
+  await setInput('#tax-payer-id', '');
+
   // 2. Empty-form Download -> gate blocks + reveals errors
   await click('#download-button');
   await sleep(200);
