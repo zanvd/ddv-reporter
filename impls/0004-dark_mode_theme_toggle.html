@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DDV Reporter — Dark Mode Theme Toggle Implementation Plan</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --muted: #5a5a5a;
+    --accent: #0b5c8a;
+    --border: #d5d9dd;
+    --bg-soft: #f6f8fa;
+    --code-bg: #eef1f4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    line-height: 1.55;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 5rem;
+  }
+  h1 { font-size: 1.8rem; line-height: 1.2; margin: 0 0 0.4rem; }
+  h2 {
+    font-size: 1.25rem;
+    margin: 2.4rem 0 0.8rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 2px solid var(--border);
+  }
+  h3 { font-size: 1.05rem; margin: 1.6rem 0 0.6rem; color: var(--accent); }
+  h4 { font-size: 0.95rem; margin: 1.2rem 0 0.5rem; }
+  p, li { font-size: 0.95rem; }
+  code {
+    background: var(--code-bg);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85em;
+  }
+  pre {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.65rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--bg-soft); font-weight: 600; }
+  tr:nth-child(even) td { background: #fbfcfd; }
+  .meta {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin: 0.15rem 0;
+  }
+  .meta strong { color: var(--fg); }
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--bg-soft);
+    padding: 0.7rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.9rem;
+  }
+  .decision {
+    border-left: 4px solid #2e7d32;
+    background: #f2faf3;
+    padding: 0.6rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.88rem;
+  }
+  .flag {
+    border-left: 4px solid #b8860b;
+    background: #fdf9ef;
+    padding: 0.6rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.88rem;
+  }
+  ul { padding-left: 1.3rem; }
+  a { color: var(--accent); word-break: break-word; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+  /* ---- palette-preview helpers (this document only) ---- */
+  .palettes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin: 1.25rem 0;
+  }
+  .palette-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .palette-card > h4 {
+    margin: 0;
+    padding: 0.6rem 0.9rem;
+    font-size: 0.9rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .palette-card.light > h4 { background: #ffffff; color: #1a1a1a; }
+  .palette-card.dark  > h4 { background: #14181d; color: #e7eaed; }
+  .swatch-list { padding: 0.75rem 0.9rem; }
+  .palette-card.light .swatch-list { background: #ffffff; }
+  .palette-card.dark  .swatch-list { background: #14181d; }
+  .swatch {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0.3rem 0;
+    font-size: 0.78rem;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .swatch .chip {
+    width: 2.4rem;
+    height: 1.5rem;
+    border-radius: 4px;
+    border: 1px solid rgba(128, 128, 128, 0.5);
+    flex: 0 0 auto;
+  }
+  .swatch .lbl { flex: 1 1 auto; line-height: 1.25; }
+  .palette-card.light .swatch .lbl { color: #1a1a1a; }
+  .palette-card.dark  .swatch .lbl { color: #e7eaed; }
+  .swatch .lbl small { opacity: 0.7; font-family: inherit; }
+
+  /* ---- mini mocked-up app sample rendered in each theme ---- */
+  .mock {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.1rem 1.2rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  .mock.light { background: #ffffff; color: #1a1a1a; }
+  .mock.dark  { background: #14181d; color: #e7eaed; }
+  .mock .mock-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 0.8rem;
+  }
+  .mock .mock-title { font-size: 1.05rem; font-weight: 700; }
+  .mock .mock-toggle {
+    width: 2rem; height: 2rem; border-radius: 6px; display: inline-flex;
+    align-items: center; justify-content: center; font-size: 1rem;
+  }
+  .mock.light .mock-toggle { border: 1px solid #d5d9dd; background: #ffffff; color: #1a1a1a; }
+  .mock.dark  .mock-toggle { border: 1px solid #414b54; background: #232b33; color: #e7eaed; }
+  .mock .mock-tabs { display: flex; gap: 0.75rem; font-size: 0.82rem; margin-bottom: 0.8rem; }
+  .mock.light .mock-tabs { border-bottom: 1px solid #d5d9dd; }
+  .mock.dark  .mock-tabs { border-bottom: 1px solid #414b54; }
+  .mock .mock-tab { padding: 0.3rem 0.1rem 0.5rem; }
+  .mock.light .mock-tab { color: #5a5a5a; }
+  .mock.dark  .mock-tab { color: #a3adb6; }
+  .mock.light .mock-tab.sel { color: #0b5c8a; font-weight: 700; border-bottom: 3px solid #0b5c8a; margin-bottom: -1px; }
+  .mock.dark  .mock-tab.sel { color: #6bb8e8; font-weight: 700; border-bottom: 3px solid #6bb8e8; margin-bottom: -1px; }
+  .mock .mock-label { display: block; font-size: 0.72rem; font-weight: 600; margin-bottom: 0.25rem; }
+  .mock .mock-input {
+    display: block; width: 100%; padding: 0.35rem 0.5rem; border-radius: 4px;
+    font-size: 0.8rem; margin-bottom: 0.2rem;
+  }
+  .mock.light .mock-input { background: #ffffff; border: 1px solid #d5d9dd; color: #1a1a1a; }
+  .mock.dark  .mock-input { background: #232b33; border: 1px solid #414b54; color: #e7eaed; }
+  .mock .mock-input.invalid { border-width: 1px; border-style: solid; }
+  .mock.light .mock-input.invalid { border-color: #b3261e; }
+  .mock.dark  .mock-input.invalid { border-color: #f0a9a4; }
+  .mock .mock-err { font-size: 0.72rem; margin: 0 0 0.7rem; }
+  .mock.light .mock-err { color: #b3261e; }
+  .mock.dark  .mock-err { color: #f0a9a4; }
+  .mock .mock-btnrow { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+  .mock .mock-btn { padding: 0.4rem 0.9rem; border-radius: 4px; font-size: 0.8rem; cursor: default; }
+  .mock.light .mock-btn.primary { background: #0b5c8a; color: #ffffff; border: none; }
+  .mock.dark  .mock-btn.primary { background: #6bb8e8; color: #10161c; border: none; }
+  .mock.light .mock-btn.outline { background: #ffffff; color: #0b5c8a; border: 1px solid #0b5c8a; }
+  .mock.dark  .mock-btn.outline { background: #232b33; color: #6bb8e8; border: 1px solid #6bb8e8; }
+  .mock .mock-ok { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; }
+  .mock.light .mock-ok { color: #2e7d32; }
+  .mock.dark  .mock-ok { color: #7fd68a; }
+  .mock .mock-badge {
+    width: 1.1rem; height: 1.1rem; border-radius: 50%; display: inline-flex;
+    align-items: center; justify-content: center; font-size: 0.65rem;
+  }
+  .mock.light .mock-badge { background: #b3261e; color: #ffffff; }
+  .mock.dark  .mock-badge { background: #f0a9a4; color: #10161c; }
+  .mock .mock-link { font-size: 0.78rem; }
+  .mock.light .mock-link { color: #0b5c8a; }
+  .mock.dark  .mock-link { color: #6bb8e8; }
+  .mock-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin: 1.25rem 0; }
+</style>
+</head>
+<body>
+
+<h1>DDV Reporter — Dark Mode Theme Toggle Implementation Plan</h1>
+<p class="meta"><strong>Plan version:</strong> 1.0</p>
+<p class="meta"><strong>Date:</strong> 2026-07-17</p>
+<p class="meta"><strong>Implements spec:</strong> <code>specs/0004-dark_mode_theme_toggle.html</code> (v1.0, confirmed)</p>
+<p class="meta"><strong>Builds on plans:</strong> <code>impls/0002-persist_general_data.html</code> (storage model reused for the
+  theme key) and <code>impls/0003-tabbed_interface_help_page.html</code> (header/tab-bar layout the toggle slots into).</p>
+<p class="meta"><strong>Status:</strong> Confirmed — approved for implementation, including the palette in §5.</p>
+<p class="meta"><strong>Scope:</strong> Technical/architecture only. The spec is the binding source of requirements; this plan
+  describes <em>how</em> to build exactly what it specifies.</p>
+
+<div class="callout">
+  <strong>Presentation-only, no logic change.</strong> This is a theming change. It touches <strong>no</strong> pure
+  logic module (<code>derive</code> / <code>validate</code> / <code>serialize</code> / <code>state</code> /
+  <code>countries</code>), no data model, no FURS field, no validation rule, and produces the identical
+  <code>DDV_KIR_KPR</code> output as specs 0001&ndash;0003. It reuses the existing <code>storage.js</code> seam for a
+  new, dedicated theme key; nothing new leaves the browser.
+</div>
+
+<div class="decision">
+  <strong>Settled decisions (confirmed with the user):</strong>
+  <ol style="margin:0.3rem 0 0;">
+    <li><strong>Accessibility state = label-only.</strong> The toggle conveys state through a state-reflecting Slovenian
+      <code>aria-label</code> (§7 of the spec); <strong>no <code>aria-pressed</code></strong> (avoids the ambiguous
+      "pressed = which theme?" semantics of a two-state theme toggle; the spec explicitly permits a state-reflecting
+      name).</li>
+    <li><strong>Instant swap, no color transition.</strong> Toggling changes tokens instantly — nothing to animate, so
+      <code>prefers-reduced-motion</code> is satisfied by construction (KISS). No global <code>transition</code> on
+      color is introduced.</li>
+    <li><strong>Palette is confirmed.</strong> The light values are the app's shipped colors; the dark values below are
+      contrast-verified and have been reviewed and approved — consistent with spec §11.4, which left exact dark-theme
+      values to implementation planning.</li>
+  </ol>
+</div>
+
+<h2>1. Overview</h2>
+<p>
+  Add a light/dark theme controlled by a single <code>data-theme</code> attribute on the <code>&lt;html&gt;</code>
+  element. The active theme is resolved and applied <strong>before first paint</strong> by a small classic inline
+  <code>&lt;script&gt;</code> in the document head (the only viable no-flash mechanism without a build step, since ES
+  modules are always deferred). All colors already come from CSS custom properties; the plan adds three missing tokens
+  (<code>--bg</code>, <code>--surface</code>, <code>--on-accent</code>) to replace the few hardcoded whites, then adds a
+  single <code>:root[data-theme="dark"]</code> block that overrides the token values. A header toggle button
+  (inline sun/moon SVG) flips the attribute, persists the choice via a new <code>themeStore.js</code> over the existing
+  <code>storage.js</code>, and updates its accessible label. Guiding principles: KISS/YAGNI — exactly two themes, one
+  control, one attribute, one override block, no framework, no new dependency.
+</p>
+
+<h2>2. Files touched</h2>
+<table>
+  <thead>
+    <tr><th>File</th><th>New?</th><th>Change</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>src/index.html</code></td>
+      <td>edit</td>
+      <td>Add the pre-paint inline <code>&lt;script&gt;</code> in <code>&lt;head&gt;</code> (before the stylesheet
+        link); wrap the existing <code>&lt;h1&gt;</code> and the new toggle <code>&lt;button&gt;</code> in
+        <code>&lt;div class="app-header"&gt;</code> (sibling above <code>.tabs</code>); the button holds inline sun and
+        moon SVGs.</td>
+    </tr>
+    <tr>
+      <td><code>src/css/styles.css</code></td>
+      <td>edit</td>
+      <td>Add <code>--bg</code>/<code>--surface</code>/<code>--on-accent</code> to <code>:root</code>; replace the
+        hardcoded <code>#fff</code> literals (§4.3) with tokens; add the <code>:root[data-theme="dark"]</code> override
+        block; add <code>color-scheme</code> per theme; set page background on <code>html</code>; add
+        <code>.app-header</code>, <code>.theme-toggle</code>, and the icon show/hide rules.</td>
+    </tr>
+    <tr>
+      <td><code>src/js/themeStore.js</code></td>
+      <td><strong>new</strong></td>
+      <td>Domain glue over <code>storage.js</code> (domain <code>theme</code>, version 1). Exports
+        <code>loadTheme()</code> &rarr; <code>'light'|'dark'|null</code> and <code>saveTheme(theme)</code> &rarr;
+        <code>boolean</code>. Mirrors <code>generalStore.js</code>. No DOM.</td>
+    </tr>
+    <tr>
+      <td><code>src/js/view/themeToggle.js</code></td>
+      <td><strong>new</strong></td>
+      <td>Exports <code>initThemeToggle(buttonEl)</code> — click flips <code>document.documentElement.dataset.theme</code>,
+        calls <code>saveTheme</code>, and syncs the <code>aria-label</code>. DOM-only, lives in <code>view/</code>.</td>
+    </tr>
+    <tr>
+      <td><code>src/js/main.js</code></td>
+      <td>edit</td>
+      <td>Add the <code>themeToggle.js</code> import and one call:
+        <code>initThemeToggle(document.getElementById('theme-toggle'))</code>. No other change.</td>
+    </tr>
+    <tr>
+      <td><code>src/js/themeStore.test.js</code></td>
+      <td><strong>new</strong></td>
+      <td>Node <code>--test</code> unit file for the pure store module (mirrors <code>generalStore.test.js</code>).</td>
+    </tr>
+    <tr>
+      <td><code>.claude/skills/run/smoke.mjs</code></td>
+      <td>edit</td>
+      <td>Extend the headless-Chrome smoke test to cover default theme, toggle behavior, icon/label swap, and app-state
+        preservation across a toggle (see §7).</td>
+    </tr>
+  </tbody>
+</table>
+<p>
+  <strong>Explicitly unchanged:</strong> all pure logic modules, every existing <code>view/</code> module,
+  <code>generalStore.js</code>, <code>storage.js</code>, <code>download.js</code>, and every existing
+  <code>*.test.js</code>. No data model, FURS field, validation rule, serialization, or <code>DDV_KIR_KPR</code> output
+  is affected.
+</p>
+
+<h2>3. Mechanism</h2>
+
+<h3>3.1 No flash of the wrong theme (spec §5)</h3>
+<p>
+  ES modules are always deferred, so <code>main.js</code> cannot run before the first paint. The only build-step-free
+  way to apply the theme pre-paint is a <strong>classic, synchronous inline <code>&lt;script&gt;</code> in
+  <code>&lt;head&gt;</code></strong>, placed <em>before</em> the stylesheet link so the attribute exists when CSS first
+  applies. It reads storage directly, resolves the theme (stored choice &rarr; OS preference &rarr; light fallback,
+  spec §5), and sets the attribute:
+</p>
+<pre>&lt;script&gt;
+(function () {
+  try {
+    var theme = null;
+    var raw = localStorage.getItem('ddvReporter.theme');
+    if (raw) {
+      var env = JSON.parse(raw);
+      var t = env &amp;&amp; env.data &amp;&amp; env.data.theme;
+      if (t === 'light' || t === 'dark') theme = t;
+    }
+    if (!theme) {
+      theme = (window.matchMedia
+        &amp;&amp; matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', theme);
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
+})();
+&lt;/script&gt;</pre>
+<div class="flag">
+  <strong>Deliberate, flagged exceptions.</strong> (a) This is the <em>only</em> inline JS in the app and the only JS
+  outside an ES module — a conscious departure from the "logic lives in modules" convention, unavoidable because
+  no-flash requires pre-paint synchronous execution that deferred modules cannot provide. (b) It <em>duplicates two
+  contract strings</em> with <code>themeStore.js</code>: the storage key <code>ddvReporter.theme</code> and the
+  envelope path <code>.data.theme</code>. This minimal duplication is intentional; both sides must honor the same key
+  and the same <code>{ version, data }</code> envelope shape that <code>storage.js</code> writes (spec 0002). The whole
+  block is wrapped in <code>try/catch</code>, so any storage failure silently falls back to light — the
+  storage-failure-tolerance requirement (spec §5, §9) holds for load as well as save.
+</div>
+
+<h3>3.2 Swapping the CSS custom properties (spec §6)</h3>
+<p>
+  <code>:root</code> keeps the <strong>light</strong> palette as the default, so the app still renders correctly with
+  no attribute and no JS. A single <code>:root[data-theme="dark"]</code> block overrides the token values. Native form
+  controls (the checkboxes, the date input, scrollbars) are switched with the CSS <code>color-scheme</code> property so
+  they render in a matching dark style rather than a bright default:
+</p>
+<pre>:root {
+  color-scheme: light;
+  --bg: #ffffff;  --surface: #ffffff;  --bg-soft: #f6f8fa;
+  --fg: #1a1a1a;  --muted: #5a5a5a;    --accent: #0b5c8a;
+  --border: #d5d9dd;  --error: #b3261e;  --success: #2e7d32;
+  --on-accent: #ffffff;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #14181d;  --surface: #232b33;  --bg-soft: #1b2127;
+  --fg: #e7eaed;  --muted: #a3adb6;    --accent: #6bb8e8;
+  --border: #414b54;  --error: #f0a9a4;  --success: #7fd68a;
+  --on-accent: #10161c;
+}
+html { background: var(--bg); }   /* fills the margins outside the centered body */</pre>
+<p>
+  The <strong>toggle icon is chosen purely in CSS from the attribute</strong> — correct at first paint, no JS needed to
+  pick it, so no icon flash:
+</p>
+<pre>.theme-toggle .icon-moon { display: none; }              /* default (light): show sun */
+:root[data-theme="dark"] .theme-toggle .icon-sun  { display: none; }
+:root[data-theme="dark"] .theme-toggle .icon-moon { display: block; }</pre>
+
+<h3>3.3 The toggle control &mdash; placement, markup, wiring (spec §4, §7, §8)</h3>
+<p>
+  The existing <code>&lt;h1&gt;</code> and the new button share a header line in a flex wrapper, a sibling
+  <strong>above</strong> the tab bar — outside both tab panels, so it is visible on every tab (spec §4). The button is a
+  native <code>&lt;button&gt;</code> (keyboard-operable for free), with a decorative icon hidden from assistive tech and
+  a Slovenian action-worded accessible name:
+</p>
+<pre>&lt;div class="app-header"&gt;
+  &lt;h1&gt;DDV Poročilo&lt;/h1&gt;
+  &lt;button type="button" id="theme-toggle" class="theme-toggle"
+          aria-label="Preklopi na temni način"&gt;
+    &lt;span class="icon-sun"  aria-hidden="true"&gt;&lt;svg …&gt;&lt;/svg&gt;&lt;/span&gt;
+    &lt;span class="icon-moon" aria-hidden="true"&gt;&lt;svg …&gt;&lt;/svg&gt;&lt;/span&gt;
+  &lt;/button&gt;
+&lt;/div&gt;
+
+&lt;div class="tabs" role="tablist" …&gt; … &lt;/div&gt;   &larr; unchanged, still below the header</pre>
+<ul>
+  <li><strong>Icon reflects the current theme</strong> (sun while light, moon while dark) via the CSS in §3.2. Both
+    SVGs are inline, self-contained (no external asset / icon font), consistent with the no-dependency architecture
+    (spec §4).</li>
+  <li><strong>Accessible name reflects the destination action</strong>: light active &rarr;
+    <code>"Preklopi na temni način"</code>; dark active &rarr; <code>"Preklopi na svetli način"</code> (spec §7).
+    The static HTML hardcodes the light-mode label; <code>themeToggle.js</code> corrects it on init from the
+    already-applied attribute (an <code>aria-label</code> is not painted, so there is no visible flash, and screen
+    readers read it on focus — after init has run).</li>
+  <li>The <strong>SVG glyphs carry <code>aria-hidden="true"</code></strong> so only the button's name is announced
+    (spec §7, §8).</li>
+  <li><strong>Focus indicator:</strong> <code>.theme-toggle:focus-visible</code> uses the accent-colored outline,
+    matching the tab pattern; it meets the §6 contrast target in both themes (see §5 table).</li>
+</ul>
+<p>The controller is tiny and DOM-only:</p>
+<pre>// view/themeToggle.js
+import { saveTheme } from '../themeStore.js';
+
+const LABEL = {
+  light: 'Preklopi na temni način',   // light active → offer dark
+  dark:  'Preklopi na svetli način',  // dark active  → offer light
+};
+
+export function initThemeToggle(buttonEl) {
+  const root = document.documentElement;
+  const sync = () =&gt; buttonEl.setAttribute('aria-label', LABEL[root.dataset.theme] || LABEL.light);
+  sync();                                   // correct the static label to the resolved theme
+  buttonEl.addEventListener('click', () =&gt; {
+    const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    root.dataset.theme = next;              // instant visual swap (all tokens re-resolve)
+    saveTheme(next);                        // failure-tolerant; return value ignored (spec §5)
+    sync();
+  });
+}</pre>
+<p>
+  The handler changes only the attribute, storage, and the label. It does <strong>not</strong> read or write app data,
+  validation state, the active tab, or scroll position, and moves no focus programmatically — so toggling mid-entry
+  changes colors only (spec §5, §9). Because only color tokens change (no box sizes), there is no reflow.
+</p>
+
+<h3>3.4 Persistence &mdash; themeStore.js (spec §5, reusing spec 0002)</h3>
+<pre>// themeStore.js
+import { readRecord, writeRecord } from './storage.js';
+
+const DOMAIN = 'theme';   // → localStorage key 'ddvReporter.theme'
+const VERSION = 1;
+const VALID = ['light', 'dark'];
+
+export function loadTheme() {
+  const record = readRecord(DOMAIN);
+  const theme = record &amp;&amp; record.data &amp;&amp; record.data.theme;
+  return VALID.includes(theme) ? theme : null;
+}
+
+export function saveTheme(theme) {
+  return writeRecord(DOMAIN, VERSION, { theme });
+}</pre>
+<ul>
+  <li>Its own dedicated key under the <code>ddvReporter.*</code> namespace — independent of and not co-mingled with the
+    Glava record (spec §5). No migration, no shared blob.</li>
+  <li>Reuses <code>storage.js</code>'s try/catch-wrapped, failure-tolerant access verbatim: a failed
+    <code>saveTheme</code> returns <code>false</code>, which the toggle ignores — the theme still changes for the
+    session, it just may not be remembered (spec §5, §9). No user-facing error.</li>
+  <li>No <code>forget</code>/remove is provided — the spec has no clear-theme requirement (YAGNI).
+    <code>loadTheme()</code> is used only by the inline head script's logic in spirit; the module itself is consumed by
+    <code>themeToggle.js</code> (save) and by the unit test. The head script inlines the equivalent read because it
+    cannot import a module (§3.1).</li>
+</ul>
+
+<h3>3.5 Data flow</h3>
+<pre>page load
+  └─ &lt;head&gt; inline script (sync, pre-paint)
+        reads localStorage 'ddvReporter.theme' → else prefers-color-scheme → else light
+        sets &lt;html data-theme="…"&gt;                     ← CSS + correct icon apply on first paint (no flash)
+
+  └─ stylesheet applies :root or :root[data-theme="dark"] token set
+
+  └─ main.js (deferred module) mounts views, then:
+        initThemeToggle(#theme-toggle) → syncs aria-label to the resolved theme, wires click
+
+user clicks toggle
+  └─ flip &lt;html data-theme&gt; (instant swap) → saveTheme() (best-effort) → re-sync aria-label</pre>
+
+<h2>4. CSS changes in detail</h2>
+<h3>4.1 New tokens added to <code>:root</code></h3>
+<table>
+  <thead><tr><th>Token</th><th>Purpose</th><th>Replaces</th></tr></thead>
+  <tbody>
+    <tr><td><code>--bg</code></td><td>Page background (set on <code>html</code>, fills the margins outside the centered <code>body</code>).</td><td>Previously the implicit browser-default white.</td></tr>
+    <tr><td><code>--surface</code></td><td>Raised surfaces: input/select fill, entry-card fill, outlined-button fill.</td><td>The hardcoded <code>#fff</code> (§4.3).</td></tr>
+    <tr><td><code>--on-accent</code></td><td>Text/glyph sitting on a filled accent or error surface (download-button label, error-badge glyph).</td><td>The hardcoded <code>#fff</code> on those two.</td></tr>
+  </tbody>
+</table>
+<h3>4.2 <code>:root[data-theme="dark"]</code> override block</h3>
+<p>Overrides all ten tokens plus <code>color-scheme</code> (values in §5). One block, no per-component dark rules.</p>
+<h3>4.3 Hardcoded literals to replace with tokens</h3>
+<table>
+  <thead><tr><th>Selector(s)</th><th>Was</th><th>Becomes</th></tr></thead>
+  <tbody>
+    <tr><td><code>.field input</code>, <code>.field select</code> (background)</td><td><code>#fff</code></td><td><code>var(--surface)</code></td></tr>
+    <tr><td><code>.entry-card</code> (background)</td><td><code>#fff</code></td><td><code>var(--surface)</code></td></tr>
+    <tr><td><code>.persist-button</code>, <code>.add-entry-button</code>, <code>.remove-entry-button</code> (background)</td><td><code>#fff</code></td><td><code>var(--surface)</code></td></tr>
+    <tr><td><code>.download-button</code> (color)</td><td><code>#fff</code></td><td><code>var(--on-accent)</code></td></tr>
+    <tr><td><code>.persist-feedback-error .persist-feedback-icon</code> (color)</td><td><code>#fff</code></td><td><code>var(--on-accent)</code></td></tr>
+  </tbody>
+</table>
+<h3>4.4 New rules</h3>
+<ul>
+  <li><code>html { background: var(--bg); }</code> and <code>body</code> keeps <code>color: var(--fg)</code>.</li>
+  <li><code>.app-header { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }</code> —
+    title left, toggle at the right edge of the content column; wraps safely on narrow widths so the toggle never
+    overflows (spec §4 responsiveness).</li>
+  <li><code>.theme-toggle</code>: transparent background, <code>1px solid var(--border)</code>, rounded, square-ish
+    tap target (~2.25rem), <code>color: var(--fg)</code> (the SVGs use <code>fill/stroke: currentColor</code> so they
+    recolor with the theme); <code>.theme-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }</code>.</li>
+  <li>The icon show/hide rules from §3.2.</li>
+  <li><code>::placeholder { color: var(--muted); }</code> so any input placeholder stays legible in dark mode
+    (spec §6 "placeholders remain legible").</li>
+</ul>
+<div class="callout">
+  <strong>No color transition is added</strong> (settled decision 2). The swap is instant, so there is nothing for
+  <code>prefers-reduced-motion</code> to gate — the requirement is met by construction. If a fade is ever wanted later,
+  it must be wrapped in the existing <code>@media (prefers-reduced-motion: reduce)</code> guard.
+</div>
+
+<h2>5. Palette (confirmed)</h2>
+<div class="flag">
+  <strong>Approved.</strong> Spec §11.4 explicitly left the exact dark-theme values to implementation planning within
+  the §6 constraints (AA contrast, preserved color semantics). The values below satisfy those constraints and are laid
+  out here — with real swatches and mini-mockups — for review; they have been reviewed and confirmed. The light values
+  are the app's already-shipped colors.
+</div>
+
+<table>
+  <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Primary usage</th></tr></thead>
+  <tbody>
+    <tr><td><code>--bg</code></td><td><code>#ffffff</code></td><td><code>#14181d</code></td><td>page background</td></tr>
+    <tr><td><code>--surface</code></td><td><code>#ffffff</code></td><td><code>#232b33</code></td><td>inputs, cards, outlined buttons</td></tr>
+    <tr><td><code>--bg-soft</code></td><td><code>#f6f8fa</code></td><td><code>#1b2127</code></td><td>sections, oss-note</td></tr>
+    <tr><td><code>--fg</code></td><td><code>#1a1a1a</code></td><td><code>#e7eaed</code></td><td>body text</td></tr>
+    <tr><td><code>--muted</code></td><td><code>#5a5a5a</code></td><td><code>#a3adb6</code></td><td>muted text, placeholders, disabled</td></tr>
+    <tr><td><code>--accent</code></td><td><code>#0b5c8a</code></td><td><code>#6bb8e8</code></td><td>links, selected tab, focus, download fill</td></tr>
+    <tr><td><code>--border</code></td><td><code>#d5d9dd</code></td><td><code>#414b54</code></td><td>borders</td></tr>
+    <tr><td><code>--error</code></td><td><code>#b3261e</code></td><td><code>#f0a9a4</code></td><td>error text/borders + error-badge fill</td></tr>
+    <tr><td><code>--success</code></td><td><code>#2e7d32</code></td><td><code>#7fd68a</code></td><td>success feedback</td></tr>
+    <tr><td><code>--on-accent</code></td><td><code>#ffffff</code></td><td><code>#10161c</code></td><td>text on accent/error fill</td></tr>
+  </tbody>
+</table>
+<p>
+  In dark mode the download button becomes a <strong>light-blue fill with dark text</strong>, and the error badge a
+  <strong>light-red fill with a dark glyph</strong> — hence a dark <code>--on-accent</code>. This is a common, legible
+  dark-mode pattern and keeps color semantics (accent=blue, error=red-family, success=green-family) intact (spec §6).
+</p>
+
+<h3>5.1 Swatches</h3>
+<div class="palettes">
+  <div class="palette-card light">
+    <h4>Light palette</h4>
+    <div class="swatch-list">
+      <div class="swatch"><span class="chip" style="background:#ffffff"></span><span class="lbl">--bg<br><small>#ffffff · page bg</small></span></div>
+      <div class="swatch"><span class="chip" style="background:#ffffff"></span><span class="lbl">--surface<br><small>#ffffff · inputs/cards/buttons</small></span></div>
+      <div class="swatch"><span class="chip" style="background:#f6f8fa"></span><span class="lbl">--bg-soft<br><small>#f6f8fa · sections</small></span></div>
+      <div class="swatch"><span class="chip" style="background:#1a1a1a"></span><span class="lbl">--fg<br><small>#1a1a1a · body text</small></span></div>
+      <div class="swatch"><span class="chip" style="background:#5a5a5a"></span><span class="lbl">--muted<br><small>#5a5a5a · muted text</small></span></div>
+      <div class="swatch"><span class="chip" style="background:#0b5c8a"></span><span class="lbl">--accent<br><small>#0b5c8a · links/CTA</small></span></div>
+      <div class="swatch"><span class="chip" style="background:#d5d9dd"></span><span class="lbl">--border<br><small>#d5d9dd · borders</small></span></div>
+      <div class="swatch"><span class="chip" style="background:#b3261e"></span><span class="lbl">--error<br><small>#b3261e · errors</small></span></div>
+      <div class="swatch"><span class="chip" style="background:#2e7d32"></span><span class="lbl">--success<br><small>#2e7d32 · success</small></span></div>
+      <div class="swatch"><span class="chip" style="background:#ffffff"></span><span class="lbl">--on-accent<br><small>#ffffff · on accent/error fill</small></span></div>
+    </div>
+  </div>
+  <div class="palette-card dark">
+    <h4>Dark palette</h4>
+    <div class="swatch-list">
+      <div class="swatch"><span class="chip" style="background:#14181d"></span><span class="lbl">--bg<br><small>#14181d · page bg</small></span></div>
+      <div class="swatch"><span class="chip" style="background:#232b33"></span><span class="lbl">--surface<br><small>#232b33 · inputs/cards/buttons</small></span></div>
+      <div class="swatch"><span class="chip" style="background:#1b2127"></span><span class="lbl">--bg-soft<br><small>#1b2127 · sections</small></span></div>
+      <div class="swatch"><span class="chip" style="background:#e7eaed"></span><span class="lbl">--fg<br><small>#e7eaed · body text</small></span></div>
+      <div class="swatch"><span class="chip" style="background:#a3adb6"></span><span class="lbl">--muted<br><small>#a3adb6 · muted text</small></span></div>
+      <div class="swatch"><span class="chip" style="background:#6bb8e8"></span><span class="lbl">--accent<br><small>#6bb8e8 · links/CTA</small></span></div>
+      <div class="swatch"><span class="chip" style="background:#414b54"></span><span class="lbl">--border<br><small>#414b54 · borders</small></span></div>
+      <div class="swatch"><span class="chip" style="background:#f0a9a4"></span><span class="lbl">--error<br><small>#f0a9a4 · errors</small></span></div>
+      <div class="swatch"><span class="chip" style="background:#7fd68a"></span><span class="lbl">--success<br><small>#7fd68a · success</small></span></div>
+      <div class="swatch"><span class="chip" style="background:#10161c"></span><span class="lbl">--on-accent<br><small>#10161c · on accent/error fill</small></span></div>
+    </div>
+  </div>
+</div>
+
+<h3>5.2 Mini mock-up in each theme</h3>
+<p>A small rendered sample of the real surfaces — header + toggle, tabs, an input, an invalid input with error text, the
+  primary and outlined buttons, a success line, an error badge, and a link — so contrast/legibility can be sanity-checked
+  directly here.</p>
+<div class="mock-grid">
+  <div class="mock light">
+    <div class="mock-head">
+      <span class="mock-title">DDV Poročilo</span>
+      <span class="mock-toggle" title="sun = light active">&#9728;</span>
+    </div>
+    <div class="mock-tabs"><span class="mock-tab sel">Poročilo</span><span class="mock-tab">Pomoč</span></div>
+    <span class="mock-label">Davčna številka</span>
+    <input class="mock-input" value="12345678" readonly>
+    <span class="mock-label">Obdobje</span>
+    <input class="mock-input invalid" value="" placeholder="npr. 2026-06" readonly>
+    <p class="mock-err">Vnesite veljavno obdobje.</p>
+    <div class="mock-btnrow">
+      <span class="mock-btn primary">Prenesi JSON</span>
+      <span class="mock-btn outline">Zapomni si</span>
+      <span class="mock-ok"><span class="mock-badge">&#10007;</span> napaka</span>
+      <span class="mock-ok">&#10003; Shranjeno</span>
+      <a class="mock-link" href="#">GitHub</a>
+    </div>
+  </div>
+  <div class="mock dark">
+    <div class="mock-head">
+      <span class="mock-title">DDV Poročilo</span>
+      <span class="mock-toggle" title="moon = dark active">&#9789;</span>
+    </div>
+    <div class="mock-tabs"><span class="mock-tab sel">Poročilo</span><span class="mock-tab">Pomoč</span></div>
+    <span class="mock-label">Davčna številka</span>
+    <input class="mock-input" value="12345678" readonly>
+    <span class="mock-label">Obdobje</span>
+    <input class="mock-input invalid" value="" placeholder="npr. 2026-06" readonly>
+    <p class="mock-err">Vnesite veljavno obdobje.</p>
+    <div class="mock-btnrow">
+      <span class="mock-btn primary">Prenesi JSON</span>
+      <span class="mock-btn outline">Zapomni si</span>
+      <span class="mock-ok"><span class="mock-badge">&#10007;</span> napaka</span>
+      <span class="mock-ok">&#10003; Shranjeno</span>
+      <a class="mock-link" href="#">GitHub</a>
+    </div>
+  </div>
+</div>
+
+<h3>5.3 Verified WCAG 2.1 AA contrast</h3>
+<p>
+  Ratios below are computed from WCAG relative luminance (sRGB linearization), not eyeballed. Targets: normal text
+  &ge;&nbsp;4.5:1, large text / meaningful UI &ge;&nbsp;3:1.
+</p>
+<table>
+  <thead><tr><th>Pair</th><th>Light</th><th>Dark</th><th>Target</th></tr></thead>
+  <tbody>
+    <tr><td>--fg on --bg</td><td>17.4:1</td><td>14.8:1</td><td>4.5</td></tr>
+    <tr><td>--fg on --surface</td><td>17.4:1</td><td>11.9:1</td><td>4.5</td></tr>
+    <tr><td>--muted on --bg</td><td>6.9:1</td><td>7.8:1</td><td>4.5</td></tr>
+    <tr><td>--muted on --surface</td><td>6.9:1</td><td>6.3:1</td><td>4.5</td></tr>
+    <tr><td>--accent text on --bg</td><td>7.2:1</td><td>8.2:1</td><td>4.5</td></tr>
+    <tr><td>--accent on --surface</td><td>7.2:1</td><td>6.6:1</td><td>4.5</td></tr>
+    <tr><td>--on-accent on --accent (download button)</td><td>7.2:1</td><td>8.4:1</td><td>4.5</td></tr>
+    <tr><td>--error text on --bg</td><td>6.5:1</td><td>9.3:1</td><td>4.5</td></tr>
+    <tr><td>--error on --surface</td><td>6.5:1</td><td>7.5:1</td><td>4.5</td></tr>
+    <tr><td>--on-accent on --error fill (badge glyph)</td><td>6.5:1</td><td>9.5:1</td><td>4.5</td></tr>
+    <tr><td>--success on --bg</td><td>5.1:1</td><td>10.1:1</td><td>4.5</td></tr>
+    <tr><td>--accent focus outline on --surface</td><td>7.2:1</td><td>6.6:1</td><td>3.0</td></tr>
+  </tbody>
+</table>
+<div class="callout">
+  <strong>Resting input borders are subtle by design in both themes.</strong> The shipped light theme's
+  <code>--border</code> on white is ~1.4:1; the dark <code>--border</code> on <code>--surface</code> is ~1.6:1
+  (i.e. at least as distinguishable as the accepted light baseline). The AA-critical 3:1 affordance for form fields is
+  carried by the <strong>focus outline</strong> (6.6:1) plus the <code>--surface</code>-vs-<code>--bg-soft</code> fill
+  difference and the always-present field label — not by the resting border. This matches how the already-accepted
+  light theme behaves; it is called out here so the trade-off is explicit rather than hidden. If reviewers want stronger
+  resting field borders in dark mode, lightening <code>--border</code> toward ~<code>#5b656f</code> reaches ~3:1 on
+  <code>--surface</code> without affecting anything else — a palette-only tweak.
+</div>
+
+<h2>6. User-facing text (Slovenian)</h2>
+<p>The only user-facing text is the toggle's accessible name (verbatim from spec §7):</p>
+<table>
+  <thead><tr><th>Active theme</th><th>Icon</th><th>aria-label (fixed)</th></tr></thead>
+  <tbody>
+    <tr><td>Light</td><td>Sun</td><td><code>Preklopi na temni način</code></td></tr>
+    <tr><td>Dark</td><td>Moon</td><td><code>Preklopi na svetli način</code></td></tr>
+  </tbody>
+</table>
+<p>Icon depicts the <em>current</em> theme; the label states the <em>destination action</em> (spec §7, §11.1). No visible
+  button text, no tooltip copy beyond the optional <code>title</code> mirroring the label.</p>
+
+<h2>7. Testing</h2>
+<ul>
+  <li><strong>Unit — <code>themeStore.test.js</code></strong> (Node <code>--test</code>, mirrors
+    <code>generalStore.test.js</code>, injecting a fake backend / stubbing <code>globalThis.localStorage</code>):
+    <ol style="margin:0.3rem 0 0;">
+      <li><code>saveTheme('dark')</code> then <code>loadTheme()</code> &rarr; <code>'dark'</code> (round-trip through the
+        <code>{ version, data }</code> envelope).</li>
+      <li><code>loadTheme()</code> with nothing stored &rarr; <code>null</code>.</li>
+      <li>Stored but invalid value (e.g. <code>'blue'</code>, or a non-theme envelope) &rarr; <code>null</code>.</li>
+      <li>Backend that throws on write &rarr; <code>saveTheme</code> returns <code>false</code> (failure-tolerance).</li>
+    </ol>
+  </li>
+  <li><strong>Existing unit suite stays green</strong> — no logic module is touched. Run <code>cd src &amp;&amp; npm test</code>.</li>
+  <li><strong>Smoke — extend <code>.claude/skills/run/smoke.mjs</code></strong> to assert:
+    <ol style="margin:0.3rem 0 0;">
+      <li>On load, <code>&lt;html&gt;</code> has a <code>data-theme</code> of <code>light</code> or <code>dark</code>
+        (default resolution ran), and no console errors.</li>
+      <li>Clicking <code>#theme-toggle</code> flips <code>data-theme</code>, swaps the visible icon (sun&harr;moon), and
+        updates <code>aria-label</code> to the matching Slovenian string.</li>
+      <li>The toggle is keyboard-focusable and shows a focus outline.</li>
+      <li><strong>State preservation:</strong> type a Glava value, switch to <em>Pomoč</em>, toggle the theme, switch
+        back — the value, the active tab, and any revealed error are unchanged (spec §5, §9).</li>
+    </ol>
+  </li>
+</ul>
+
+<h2>8. Build sequence</h2>
+<ol>
+  <li><strong>styles.css</strong> — add the three tokens + <code>color-scheme</code>, the
+    <code>:root[data-theme="dark"]</code> block, <code>html</code> background, and swap the hardcoded <code>#fff</code>s
+    (§4). App looks identical in light; dark is reachable by manually setting the attribute.</li>
+  <li><strong>index.html</strong> — add the pre-paint inline head script (§3.1) and the <code>.app-header</code> wrapper
+    with the toggle button + inline SVGs (§3.3), plus the <code>.theme-toggle</code>/icon CSS.</li>
+  <li><strong>themeStore.js</strong> — the store module (§3.4).</li>
+  <li><strong>view/themeToggle.js</strong> — the controller (§3.3).</li>
+  <li><strong>main.js</strong> — import and call <code>initThemeToggle(...)</code>.</li>
+  <li><strong>themeStore.test.js</strong> + <strong>smoke.mjs</strong> — add tests (§7); run unit + smoke.</li>
+</ol>
+
+<h2>9. Assumptions &amp; out-of-scope</h2>
+<ul>
+  <li><strong>Out of scope (spec §3):</strong> more than two themes, user-customizable colors, per-tab/per-section
+    theming, cross-device sync, live-following the OS after an explicit choice, a second entry point / settings panel,
+    print optimization (spec §9/§11.4), and any change to data model, FURS fields, validation, serialization, or the
+    <code>DDV_KIR_KPR</code> output.</li>
+  <li><strong>Assumptions:</strong> (a) the theme key is <code>ddvReporter.theme</code> using the same
+    <code>{ version, data }</code> envelope <code>storage.js</code> already writes — the inline head script and
+    <code>themeStore.js</code> both depend on this shared contract (§3.1 flag); (b) the two inline SVGs (sun, moon) are
+    authored locally with <code>currentColor</code> fills so they recolor with the theme — no external icon asset is
+    introduced (spec §4); (c) the dark hex values in §5 were left to implementation planning by spec §11.4 and have
+    been reviewed and confirmed here.</li>
+</ul>
+
+</body>
+</html>
