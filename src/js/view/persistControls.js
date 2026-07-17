@@ -7,10 +7,12 @@
 //   - "Pozabi" enabled/disabled, computed from hasSavedGeneral() and
 //     refreshed after every *successful* save/forget (a failed action
 //     leaves it unchanged).
-//   - Each button's own transient feedback slot (green check on success,
-//     red circle-with-X + "Poskusite znova." on failure), auto-hidden after
-//     3 seconds; a fresh click on the same button resets the timer to the
-//     latest outcome.
+//   - One shared, last-action-wins feedback slot appended after both
+//     buttons (green check on success, red circle-with-X +
+//     "Poskusite znova." on failure), auto-hidden after 3 seconds; a fresh
+//     click on either button immediately replaces the visible message and
+//     resets the timer. Keeping the slot after both buttons (not between
+//     them) means its show/hide never shifts either button's position.
 
 import { forgetGeneral, hasSavedGeneral, saveGeneral } from '../generalStore.js';
 
@@ -71,13 +73,13 @@ export function renderPersistControls(container, state) {
   saveButton.type = 'button';
   saveButton.className = 'persist-button';
   saveButton.textContent = 'Zapomni si';
-  const saveFeedback = createFeedbackSlot();
 
   const forgetButton = document.createElement('button');
   forgetButton.type = 'button';
   forgetButton.className = 'persist-button forget';
   forgetButton.textContent = 'Pozabi';
-  const forgetFeedback = createFeedbackSlot();
+
+  const sharedFeedback = createFeedbackSlot();
 
   function refreshForgetEnabled() {
     forgetButton.disabled = !hasSavedGeneral();
@@ -85,18 +87,18 @@ export function renderPersistControls(container, state) {
 
   saveButton.addEventListener('click', () => {
     const success = saveGeneral(state.general);
-    saveFeedback.show(success, success ? 'Shranjeno' : 'Poskusite znova.');
+    sharedFeedback.show(success, success ? 'Shranjeno' : 'Poskusite znova.');
     if (success) refreshForgetEnabled();
   });
 
   forgetButton.addEventListener('click', () => {
     const success = forgetGeneral();
-    forgetFeedback.show(success, success ? 'Pozabljeno' : 'Poskusite znova.');
+    sharedFeedback.show(success, success ? 'Pozabljeno' : 'Poskusite znova.');
     if (success) refreshForgetEnabled();
   });
 
   refreshForgetEnabled();
 
-  row.append(saveButton, saveFeedback.element, forgetButton, forgetFeedback.element);
+  row.append(saveButton, forgetButton, sharedFeedback.element);
   container.appendChild(row);
 }

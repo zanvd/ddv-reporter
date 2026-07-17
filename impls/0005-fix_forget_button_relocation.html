@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DDV Reporter — Fix "Pozabi" Button Relocation Implementation Plan</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --muted: #5a5a5a;
+    --accent: #0b5c8a;
+    --border: #d5d9dd;
+    --bg-soft: #f6f8fa;
+    --code-bg: #eef1f4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    line-height: 1.55;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 5rem;
+  }
+  h1 { font-size: 1.8rem; line-height: 1.2; margin: 0 0 0.4rem; }
+  h2 {
+    font-size: 1.25rem;
+    margin: 2.4rem 0 0.8rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 2px solid var(--border);
+  }
+  h3 { font-size: 1.05rem; margin: 1.6rem 0 0.6rem; color: var(--accent); }
+  h4 { font-size: 0.95rem; margin: 1.2rem 0 0.5rem; }
+  p, li { font-size: 0.95rem; }
+  code {
+    background: var(--code-bg);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85em;
+  }
+  pre {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.65rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--bg-soft); font-weight: 600; }
+  tr:nth-child(even) td { background: #fbfcfd; }
+  .meta {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin: 0.15rem 0;
+  }
+  .meta strong { color: var(--fg); }
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--bg-soft);
+    padding: 0.7rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.9rem;
+  }
+  .decision {
+    border-left: 4px solid #2e7d32;
+    background: #f2faf3;
+    padding: 0.6rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.88rem;
+  }
+  .flag {
+    border-left: 4px solid #b8860b;
+    background: #fdf9ef;
+    padding: 0.6rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.88rem;
+  }
+  ul { padding-left: 1.3rem; }
+  a { color: var(--accent); word-break: break-word; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  .file { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.85em; }
+</style>
+</head>
+<body>
+
+<h1>DDV Reporter — Fix "Pozabi" Button Relocation on Status Message</h1>
+<p class="meta"><strong>Version:</strong> 1.0 (implementation plan)</p>
+<p class="meta"><strong>Date:</strong> 2026-07-17</p>
+<p class="meta"><strong>Status:</strong> Approved — ready for implementation</p>
+<p class="meta"><strong>Type:</strong> Bug fix — view-layer only. No new feature, no tax logic, no schema/validation change.</p>
+<p class="meta"><strong>Source spec:</strong> <span class="file">specs/0005-fix_forget_button_relocation.html</span></p>
+<p class="meta"><strong>Builds on:</strong> Spec/impl 0002 (Persist General (Glava) Data) — refines that feature's save/forget
+  feedback layout only; all persistence, validation, and enable/disable logic is unchanged.</p>
+
+<div class="callout">
+  <strong>Proportionality.</strong> This is a small, targeted layout fix in a single view module. The bug is a
+  DOM-order problem, not a logic problem, so the plan introduces no new modules, state, dependencies, timers,
+  CSS rules, or abstractions. Every change below traces to a requirement in spec 0005; nothing beyond it.
+</div>
+
+<h2>1. Overview</h2>
+<p>
+  The persist-controls row (<code>.persist-row</code>) renders in <span class="file">src/js/view/persistControls.js</span>
+  as a flex row. The bug is purely DOM order: the <em>save</em> feedback span is appended <strong>between</strong>
+  the two buttons, so showing/hiding it takes and releases horizontal space, shoving "Pozabi" sideways
+  (spec §2). The fix collapses the two per-button feedback slots into <strong>one shared slot</strong> appended
+  <strong>after both buttons</strong>. Because that slot now sits past both buttons, toggling its visibility
+  can no longer move either button (spec R1/R2), and routing both actions through one slot gives
+  last-action-wins for free (spec R3). No CSS, storage, validation, or copy changes.
+</p>
+
+<h2>2. Root cause</h2>
+<p>Current append order in <code>renderPersistControls()</code>:</p>
+<pre>row.append(saveButton, saveFeedback.element, forgetButton, forgetFeedback.element);
+//                      ^^^^^^^^^^^^^^^^^^^^^ interleaved between the buttons — the bug</pre>
+<p>
+  Each feedback slot is a <code>role="status"</code> span, <code>hidden</code> by default
+  (<code>.persist-feedback[hidden] { display: none }</code>) and shown for 3&nbsp;s after its button's action.
+  Since the save slot occupies flex space between the buttons, its show/hide shifts "Pozabi" horizontally.
+</p>
+
+<h2>3. Scope of change</h2>
+<p><strong>Exactly one file is modified:</strong></p>
+<table>
+  <thead><tr><th>File</th><th>Change</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="file">src/js/view/persistControls.js</td>
+      <td>Replace the two per-button feedback slots with one shared slot; reorder the append so both buttons are
+        adjacent and the shared slot follows them; route both click handlers to the shared slot; update the
+        module doc comment to match.</td>
+    </tr>
+  </tbody>
+</table>
+<p><strong>Explicitly not touched:</strong></p>
+<ul>
+  <li><span class="file">src/css/styles.css</span> — no CSS change (see §5).</li>
+  <li>Logic modules — <span class="file">generalStore.js</span>, <span class="file">storage.js</span>,
+    <span class="file">validate.js</span>, <span class="file">serialize.js</span>, <span class="file">state.js</span>
+    — untouched. Consistent with CLAUDE.md: pure logic stays DOM-free; this fix lives entirely in the view layer.</li>
+  <li>Message copy, button labels, icon styling, and the 3000&nbsp;ms duration (spec §5 preserved behavior).</li>
+</ul>
+
+<h2>4. The change, precisely</h2>
+
+<h3>R2 — one shared feedback slot, appended after both buttons</h3>
+<p>
+  <code>createFeedbackSlot()</code> already produces a self-contained <code>role="status"</code> span whose
+  <code>show(success, message)</code> sets the success/error class, writes the text, unhides, and (re)arms a
+  single hide timer. It is called <strong>once</strong> instead of twice. New append order:
+</p>
+<pre>const sharedFeedback = createFeedbackSlot();
+// ...
+row.append(saveButton, forgetButton, sharedFeedback.element);
+//         ^^^^^^^^^^^^^^^^^^^^^^^^^ buttons adjacent   ^^^^^^^ single shared area, last</pre>
+
+<h3>R3 — last-action-wins, timer restart</h3>
+<p>Both handlers target the same slot:</p>
+<pre>saveButton.addEventListener('click', () =&gt; {
+  const success = saveGeneral(state.general);
+  sharedFeedback.show(success, success ? 'Shranjeno' : 'Poskusite znova.');
+  if (success) refreshForgetEnabled();
+});
+
+forgetButton.addEventListener('click', () =&gt; {
+  const success = forgetGeneral();
+  sharedFeedback.show(success, success ? 'Pozabljeno' : 'Poskusite znova.');
+  if (success) refreshForgetEnabled();
+});</pre>
+<div class="decision">
+  <strong>Last-action-wins is inherited, not added.</strong> <code>show()</code> already calls
+  <code>clearTimeout(hideTimer)</code> and rewrites icon/text/class on every invocation. With a single shared
+  slot, a save-or-forget click within the 3&nbsp;s window immediately overwrites the visible message and
+  restarts the timer — satisfying R3 and all §8 edge cases with <strong>no new timer or state logic</strong>
+  (KISS/YAGNI). The existing <code>FEEDBACK_DURATION_MS = 3000</code> constant is reused verbatim.
+</div>
+
+<h3>R1 — stable "Pozabi" position</h3>
+<p>
+  With the shared slot appended after both buttons, its <code>display: none ⇄ inline-flex</code> transition
+  only adds/removes space to the <em>right</em> of "Pozabi". Neither button moves. The reorder alone satisfies
+  R1; per spec R1, <strong>no fixed-width reservation of the feedback area is introduced.</strong>
+</p>
+
+<h3>Doc comment</h3>
+<p>
+  The module header comment (lines ~6–13) currently states "Each button's own transient feedback slot …".
+  Update it to describe <strong>one shared, last-action-wins slot after both buttons</strong>, so the comment
+  matches the code. Comment stays English per CLAUDE.md (developer-facing text).
+</p>
+
+<h2>5. Why no CSS change</h2>
+<p>
+  Position is governed entirely by DOM order within the existing <code>.persist-row</code> flex container
+  (<code>display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem</code>). The only thing changing is
+  append order, in JS. The existing rules — <code>.persist-feedback</code>, <code>.persist-feedback[hidden]</code>,
+  and the success/error icon/text rules — apply unchanged to the single shared span (same class names).
+  Adding CSS here would be unwarranted complexity.
+</p>
+<div class="flag">
+  <strong>Naming note.</strong> The <code>saveFeedback</code> / <code>forgetFeedback</code> local variable names
+  collapse to a single <code>sharedFeedback</code>. These are internal identifiers only — no user-facing label
+  is affected, and no FURS wire-format name is involved.
+</div>
+
+<h2>6. Preserved behavior (verify unchanged)</h2>
+<table>
+  <thead><tr><th>Behavior (spec §5)</th><th>How it stays intact</th></tr></thead>
+  <tbody>
+    <tr><td>Success (green check) vs. error (red circle-with-X) styling</td>
+      <td>Same <code>persist-feedback-success</code> / <code>persist-feedback-error</code> classes toggled by <code>show()</code>.</td></tr>
+    <tr><td>Copy: "Shranjeno" / "Pozabljeno" / "Poskusite znova."</td>
+      <td>Passed unchanged into <code>show()</code> from the same handlers.</td></tr>
+    <tr><td><code>role="status"</code> live-region announcement</td>
+      <td>The shared slot is still built by <code>createFeedbackSlot()</code>, which sets <code>role="status"</code>.</td></tr>
+    <tr><td>"Pozabi" disabled state via <code>hasSavedGeneral()</code>, refreshed only on success</td>
+      <td><code>refreshForgetEnabled()</code> and its <code>if (success)</code> guards are unchanged in both handlers.</td></tr>
+    <tr><td>3000&nbsp;ms duration</td><td><code>FEEDBACK_DURATION_MS</code> reused as-is.</td></tr>
+  </tbody>
+</table>
+
+<h2>7. Testing</h2>
+<p>
+  View modules have no unit tests in this repo (DOM-bound); logic modules do. Persist controls currently have
+  no smoke coverage. Per the approved decision, this fix adds a <strong>lightweight smoke-test assertion</strong>
+  via <span class="file">.claude/skills/run/</span> (serve <span class="file">src/</span>, drive headless Chrome
+  over CDP — see <span class="file">.claude/skills/run/smoke.mjs</span>). Two invariants, matching the two things
+  the fix changes:
+</p>
+<ul>
+  <li><strong>R1 — position stability:</strong> read the "Pozabi" button's left offset
+    (<code>getBoundingClientRect().left</code>) with no message shown, trigger a save so the shared message
+    appears, and assert the offset is unchanged while the message is visible.</li>
+  <li><strong>R3 — last-action-wins replacement:</strong> click save, then click forget within the window, and
+    assert exactly one visible <code>.persist-feedback</code> whose text is the latest action's message
+    ("Pozabljeno"), confirming replacement in the single shared slot.</li>
+</ul>
+<p>
+  Keep the assertion minimal and consistent with the existing smoke harness. No new unit-test files; no change
+  to <code>cd src &amp;&amp; npm test</code> logic-module suites (they are unaffected by a view-only change).
+</p>
+
+<h2>8. Work sequence</h2>
+<ol>
+  <li>Edit <span class="file">persistControls.js</span>: single <code>sharedFeedback</code> slot, reorder append,
+    route both handlers, update the doc comment (one chunk — the whole fix is a few lines).</li>
+  <li>Add the smoke assertion for R1 (position stability) and R3 (message replacement).</li>
+  <li>Manual/smoke verification: save, forget, rapid alternating clicks, and let a message expire — confirm
+    "Pozabi" never shifts and only the latest message shows.</li>
+</ol>
+
+<h2>9. Assumptions &amp; out of scope</h2>
+<ul>
+  <li><strong>Out of scope (spec §3):</strong> save/forget logic, local-storage persistence, auto-restore,
+    validation, the download gate, the DDV_KIR_KPR output, FURS rules, message copy, button labels, icon
+    styling, and the 3-second duration — none change.</li>
+  <li><strong>Assumption:</strong> the flex <code>.persist-row</code> lays out purely by DOM order (no explicit
+    CSS <code>order</code> on children). Confirmed in <span class="file">styles.css</span> — no
+    <code>order</code> property is set — so append order is authoritative.</li>
+  <li><strong>No FURS dependency</strong> (spec §9): this is a UI layout fix with no wire-format, schema, or
+    regulatory implication; nothing to validate against the reference artifacts.</li>
+</ul>
+
+</body>
+</html>

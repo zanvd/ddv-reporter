@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DDV Reporter — Fix "Pozabi" Button Relocation on Status Message Specification</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --muted: #5a5a5a;
+    --accent: #0b5c8a;
+    --border: #d5d9dd;
+    --bg-soft: #f6f8fa;
+    --code-bg: #eef1f4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    line-height: 1.55;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 5rem;
+  }
+  h1 { font-size: 1.8rem; line-height: 1.2; margin: 0 0 0.4rem; }
+  h2 {
+    font-size: 1.25rem;
+    margin: 2.4rem 0 0.8rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 2px solid var(--border);
+  }
+  h3 { font-size: 1.05rem; margin: 1.6rem 0 0.6rem; color: var(--accent); }
+  p, li { font-size: 0.95rem; }
+  code {
+    background: var(--code-bg);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85em;
+  }
+  pre {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.65rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--bg-soft); font-weight: 600; }
+  tr:nth-child(even) td { background: #fbfcfd; }
+  .meta {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin: 0.15rem 0;
+  }
+  .meta strong { color: var(--fg); }
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--bg-soft);
+    padding: 0.7rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.9rem;
+  }
+  ul { padding-left: 1.3rem; }
+  a { color: var(--accent); word-break: break-word; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  .sources li { margin-bottom: 0.6rem; }
+</style>
+</head>
+<body>
+
+<h1>DDV Reporter — Fix "Pozabi" Button Relocation on Status Message</h1>
+<p class="meta"><strong>Version:</strong> 1.0 (draft for implementation planning)</p>
+<p class="meta"><strong>Date:</strong> 2026-07-17</p>
+<p class="meta"><strong>Status:</strong> Confirmed — ready for implementation planning</p>
+<p class="meta"><strong>Type:</strong> Bug fix — UI / layout only. No new feature, no tax logic.</p>
+<p class="meta"><strong>Scope:</strong> Product / requirements only. No technical, architectural, or implementation decisions.</p>
+<p class="meta"><strong>Builds on:</strong> Spec 0002 (Persist General (Glava) Data) — this refines the save/forget
+  feedback behavior defined there. All of spec 0002's save/forget, storage, and validation behavior is
+  otherwise unchanged.</p>
+
+<div class="callout">
+  <strong>Not a VAT rule.</strong> This is a <em>UI layout fix</em> in the Glava persist-controls row. It
+  introduces no tax logic and changes nothing about how DDV is reported, calculated, or validated against
+  FURS rules. There is no FURS / ZDDV-1 dependency to research or cite for the behavior described here
+  (see §9).
+</div>
+
+<h2>1. Summary</h2>
+<p>
+  Fix a layout bug in the Glava persist-controls row (<code>.persist-row</code>): the <strong>"Pozabi"</strong>
+  (forget) button jumps horizontally whenever the save status message appears or disappears. Fix by placing
+  the two buttons <strong>adjacent to each other</strong>, followed by a <strong>single shared feedback
+  area</strong> to the right of both buttons that shows only the <strong>most recent</strong> action's message
+  (save <em>or</em> forget) for 3 seconds. The forget button's on-screen position becomes stable and no longer
+  depends on transient status-message visibility.
+</p>
+
+<h2>2. Background / the bug</h2>
+<p>
+  Spec 0002 introduced the "Zapomni si" (save) / "Pozabi" (forget) action row with a transient feedback
+  indicator next to <em>each</em> button. In the current layout the row renders four elements in this flex
+  DOM order:
+</p>
+<pre>[ "Zapomni si" button, save feedback, "Pozabi" button, forget feedback ]</pre>
+<p>
+  Each feedback slot is a <code>role="status"</code> span that is <code>hidden</code> by default
+  (<code>display: none</code>) and shown for 3 seconds after its button's action, then hidden again. Because
+  the <strong>save feedback sits between the two buttons</strong> in the flex row, its appearance takes
+  horizontal space and its disappearance releases it — which pushes the "Pozabi" button left/right depending
+  on whether a save status message is currently showing.
+</p>
+<p>
+  That horizontal jump is the bug: <strong>the forget button's position depends on transient status-message
+  visibility.</strong>
+</p>
+
+<h2>3. Scope</h2>
+<h3>In scope</h3>
+<ul>
+  <li><strong>Reorder</strong> the persist-controls row so both buttons sit adjacent to each other first,
+    with a <strong>single shared feedback area after both buttons</strong>, not interleaved between them
+    (§4, R2).</li>
+  <li><strong>Stable "Pozabi" position:</strong> the forget button must never move because a status message
+    appeared or disappeared (§4, R1).</li>
+  <li><strong>Last-action-wins feedback:</strong> only one message is visible at a time, showing the most
+    recent action's outcome for 3 seconds (§4, R3).</li>
+</ul>
+<h3>Out of scope</h3>
+<ul>
+  <li>Any change to the <strong>save / forget logic</strong>, local-storage persistence, or auto-restore
+    behavior (all per spec 0002).</li>
+  <li>Any change to <strong>validation</strong>, the download gate, the DDV_KIR_KPR output, or FURS rules.</li>
+  <li>Any change to the <strong>message copy</strong> ("Shranjeno", "Pozabljeno", "Poskusite znova."), the
+    button labels ("Zapomni si", "Pozabi"), the success/error <strong>icon styling</strong>, or the
+    <strong>3-second</strong> duration.</li>
+  <li>No new user-facing copy is introduced.</li>
+</ul>
+
+<h2>4. Requirements</h2>
+
+<h3>R1 — Stable "Pozabi" position</h3>
+<p>
+  The "Pozabi" button's on-screen position must be <strong>stable</strong>: it must never move because a
+  status message appeared or disappeared. Since the shared feedback area sits <strong>after</strong> both
+  buttons (R2), toggling its visibility can no longer shift either button — the reorder alone satisfies this
+  requirement. No fixed-width reservation of the feedback area is required.
+</p>
+
+<h3>R2 — Single shared feedback area after both buttons</h3>
+<p>
+  Reorder the row so the two buttons are adjacent, followed by one shared feedback area:
+</p>
+<pre>[ "Zapomni si" button, "Pozabi" button, shared feedback area ]</pre>
+<p>
+  Both the "Zapomni si" and "Pozabi" outcomes render into this <strong>same</strong> feedback area. The two
+  separate, interleaved per-button feedback slots are replaced by this single shared area.
+</p>
+
+<h3>R3 — Last-action-wins, 3 seconds</h3>
+<ul>
+  <li>At most <strong>one</strong> message is visible at a time.</li>
+  <li>A message stays visible for <strong>3 seconds</strong> (the existing <code>FEEDBACK_DURATION_MS</code> =
+    3000 ms) from its action, then hides.</li>
+  <li>If <em>either</em> button (save or forget) is clicked again before the timer elapses, the new action's
+    message <strong>immediately replaces</strong> the current one and the 3-second timer <strong>restarts</strong>.</li>
+  <li>Only the <strong>last</strong> action's message is ever shown — for 3 seconds from that action.</li>
+</ul>
+
+<h2>5. Preserved behavior (must not change)</h2>
+<p>Everything below is existing behavior from spec 0002 and must be preserved verbatim by this fix:</p>
+<ul>
+  <li><strong>Success vs. error styling:</strong> green checkmark for a successful action; red circle-with-X
+    for a failure — the existing visual language (success/error icon + text color) is unchanged.</li>
+  <li><strong>Message copy, unchanged (no new copy):</strong> <code>"Shranjeno"</code> (successful save),
+    <code>"Pozabljeno"</code> (successful forget), <code>"Poskusite znova."</code> (failed save or forget).
+    All user-facing text remains <strong>Slovenian</strong> per project convention.</li>
+  <li><strong>Accessibility:</strong> the shared feedback area keeps the <code>role="status"</code>
+    live-region behavior so the latest message is announced.</li>
+  <li><strong>"Pozabi" disabled state</strong> is still driven by <code>hasSavedGeneral()</code> and refreshed
+    only after a <em>successful</em> save (→ enabled) or forget (→ disabled); a failed action leaves it
+    unchanged.</li>
+  <li>The <strong>3000 ms</strong> duration constant is unchanged.</li>
+</ul>
+
+<h2>6. Behavior table</h2>
+<table>
+  <thead>
+    <tr><th>Action</th><th>Shared feedback area shows</th><th>Duration</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Successful "Zapomni si"</td><td>Green check + "Shranjeno"</td><td>3 s</td></tr>
+    <tr><td>Failed "Zapomni si"</td><td>Red circle-with-X + "Poskusite znova."</td><td>3 s</td></tr>
+    <tr><td>Successful "Pozabi"</td><td>Green check + "Pozabljeno"</td><td>3 s</td></tr>
+    <tr><td>Failed "Pozabi"</td><td>Red circle-with-X + "Poskusite znova."</td><td>3 s</td></tr>
+    <tr><td>New action (save or forget) before the prior timer elapses</td><td>New message replaces the old one immediately</td><td>Timer restarts at 3 s</td></tr>
+  </tbody>
+</table>
+
+<h2>7. Layout illustration</h2>
+<p><strong>Before (bug):</strong> feedback interleaved between the buttons — a visible save message pushes "Pozabi" sideways.</p>
+<pre>[ Zapomni si ] [ ✓ Shranjeno ] [ Pozabi ] [           ]
+                ^ appears/disappears, shoving "Pozabi" left/right</pre>
+<p><strong>After (fixed):</strong> buttons adjacent, single shared feedback area to the right of both.</p>
+<pre>[ Zapomni si ] [ Pozabi ] [ ✓ Shranjeno ]
+                          ^ appears/disappears to the RIGHT of both buttons;
+                            neither button ever moves</pre>
+
+<h2>8. Edge cases</h2>
+<table>
+  <thead>
+    <tr><th>Case</th><th>Expected handling</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Rapid alternating save/forget clicks</td>
+      <td>Only the latest outcome is shown in the shared area; the 3-second timer always reflects the most
+        recent click (R3).</td>
+    </tr>
+    <tr>
+      <td>Same button clicked repeatedly before the timer elapses</td>
+      <td>The message updates to the latest outcome and the timer restarts (R3).</td>
+    </tr>
+    <tr>
+      <td>A failed action after a prior success (or vice versa) within 3 s</td>
+      <td>The shared area switches to the newest action's message (success ↔ failure) and restarts the timer.
+        The "Pozabi" disabled-state refresh still occurs only on success (§5).</td>
+    </tr>
+    <tr>
+      <td>Message currently visible when its 3 s elapse with no new action</td>
+      <td>The shared area hides; "Pozabi" position is unaffected (R1) since the area sits after both buttons.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>9. References / notes</h2>
+<p>
+  This is a <strong>UI / layout bug fix</strong> only. It has no dependency on any FURS form, the ZDDV-1
+  statute, the Pravilnik o izvajanju ZDDV-1, or any EU VAT rule, and it does not change the DDV_KIR_KPR file,
+  its fields, or its validation. Accordingly, <strong>no external legal or regulatory sources apply</strong>,
+  and none are cited — a deliberate note, not an omission.
+</p>
+<p>The only relevant references are internal:</p>
+<ul>
+  <li><strong>Spec 0002 — Persist General (Glava) Data</strong>
+    (<code>specs/0002-persist_general_data.html</code>): defines the "Zapomni si" / "Pozabi" controls, their
+    Slovenian labels and feedback copy, the success/failure indicator behavior, and the "Pozabi"
+    enabled/disabled rule that this fix preserves.</li>
+  <li><strong>Project conventions</strong> (repo-root <code>CLAUDE.md</code>): all user-facing text is
+    Slovenian; validation remains the single source of truth for field errors; pure logic modules stay
+    DOM-free (this fix touches the view layer only).</li>
+</ul>
+
+<h2>10. Open questions</h2>
+<p>None. The reorder-only approach (no fixed-width reservation) and the last-action-wins single shared
+  feedback area are confirmed.</p>
+
+</body>
+</html>
