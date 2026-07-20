@@ -12,7 +12,15 @@ import { test } from 'node:test';
 
 import { derivePeriod } from './derive.js';
 import { serialize } from './serialize.js';
-import { addKirEntry, addKprEntry, createState, removeKirEntry, updateGeneral } from './state.js';
+import {
+  addKirEntry,
+  addKprEntry,
+  createState,
+  removeKirEntry,
+  updateGeneral,
+  updateKirEntry,
+  updateKprEntry,
+} from './state.js';
 import { hasAnyErrors, validateState } from './validate.js';
 
 function validKirFields(overrides = {}) {
@@ -249,4 +257,110 @@ test('full pipeline: blank optional amounts are omitted and an explicit "0" is p
   assert.ok(!('P14' in entry));
   assert.ok(!('P15' in entry));
   assert.ok(!('P16' in entry));
+});
+
+// --- Partner-backed row equivalence (plan 0006 §5.6/§7, §9.4) ----------------
+//
+// Partner-backed rows introduce no new state shape or output path: on
+// selecting a partner, view/entryList.js calls the exact same
+// updateKirEntry/updateKprEntry a manually-typed field's input event would
+// call, with a patch built from the partner's countryCode/vatId(/name) —
+// KIR's config.partner.copyFrom maps to customerCountry/customerVatId; KPR's
+// also maps supplierName. These tests reproduce that patch directly against
+// state.js (no DOM/view layer involved) and assert the pipeline is
+// byte-for-byte indifferent to whether a row's identity values arrived by
+// typing or by a partner-copy patch.
+
+function partnerBackedCustomer(partner) {
+  return { customerCountry: partner.countryCode, customerVatId: partner.vatId };
+}
+
+function partnerBackedSupplier(partner) {
+  return { supplierName: partner.name, supplierCountry: partner.countryCode, supplierVatId: partner.vatId };
+}
+
+test('partner-backed vs. typed KIR row: identical serialized output for the same identity values', () => {
+  const partner = { id: 1, name: 'Acme d.o.o.', countryCode: 'DE', vatId: '123456789' };
+
+  const typedState = createState();
+  updateGeneral(typedState, { taxPayerID: '12345678', periodType: 'monthly', periodUnit: 6, periodYear: '2026' });
+  addKirEntry(typedState, validKirFields({ customerCountry: partner.countryCode, customerVatId: partner.vatId }));
+
+  // A fresh partner-backed row starts blank (config.addEntry(state, emptyFields)),
+  // then selecting the partner applies copyFrom(partner) via updateKirEntry —
+  // exactly like a normal field's change handler.
+  const partnerBackedState = createState();
+  updateGeneral(partnerBackedState, { taxPayerID: '12345678', periodType: 'monthly', periodUnit: 6, periodYear: '2026' });
+  const entryId = addKirEntry(partnerBackedState, validKirFields());
+  updateKirEntry(partnerBackedState, entryId, partnerBackedCustomer(partner));
+
+  assert.equal(hasAnyErrors(validateState(typedState)), false);
+  assert.equal(hasAnyErrors(validateState(partnerBackedState)), false);
+  assert.equal(serialize(typedState), serialize(partnerBackedState));
+});
+
+test('partner-backed vs. typed KPR row: identical serialized output for the same identity values (name/country/vatId all copied)', () => {
+  const partner = { id: 1, name: 'Acme d.o.o.', countryCode: 'SI', vatId: '12345678' };
+  const sharedFields = {
+    postingDate: '2026-06-15',
+    documentNumber: 'BILL-001',
+    dateReceived: '2026-06-16',
+    documentDate: '2026-06-10',
+    netValue: '50.00',
+    deductVat22: '11.00',
+    deductVat95: '',
+    deductVat5: '',
+    flatRate8: '',
+  };
+
+  const typedState = createState();
+  updateGeneral(typedState, { taxPayerID: '12345678', periodType: 'monthly', periodUnit: 6, periodYear: '2026' });
+  addKprEntry(typedState, {
+    ...sharedFields,
+    supplierName: partner.name,
+    supplierCountry: partner.countryCode,
+    supplierVatId: partner.vatId,
+  });
+
+  const partnerBackedState = createState();
+  updateGeneral(partnerBackedState, { taxPayerID: '12345678', periodType: 'monthly', periodUnit: 6, periodYear: '2026' });
+  const entryId = addKprEntry(partnerBackedState, { ...sharedFields, supplierName: '', supplierCountry: '', supplierVatId: '' });
+  updateKprEntry(partnerBackedState, entryId, partnerBackedSupplier(partner));
+
+  assert.equal(hasAnyErrors(validateState(typedState)), false);
+  assert.equal(hasAnyErrors(validateState(partnerBackedState)), false);
+  assert.equal(serialize(typedState), serialize(partnerBackedState));
+});
+
+test('a partner-backed KIR row with no partner selected (blank customer identity) does not block the Download gate — a valid optional pair, same as a typed row left blank', () => {
+  const state = createState();
+  updateGeneral(state, { taxPayerID: '12345678', periodType: 'monthly', periodUnit: 6, periodYear: '2026' });
+  addKirEntry(state, validKirFields()); // blank customerCountry/customerVatId, as a fresh partner-backed row starts
+
+  assert.equal(hasAnyErrors(validateState(state)), false);
+});
+
+test('a partner-backed KPR row with no partner selected (blank supplier identity) blocks the Download gate, same as a typed row left blank', () => {
+  const state = createState();
+  updateGeneral(state, { taxPayerID: '12345678', periodType: 'monthly', periodUnit: 6, periodYear: '2026' });
+  addKprEntry(state, {
+    postingDate: '2026-06-15',
+    documentNumber: 'BILL-001',
+    dateReceived: '2026-06-16',
+    documentDate: '2026-06-10',
+    supplierName: '',
+    supplierCountry: '',
+    supplierVatId: '',
+    netValue: '50.00',
+    deductVat22: '',
+    deductVat95: '',
+    deductVat5: '',
+    flatRate8: '',
+  }); // blank supplier identity, as a fresh partner-backed row starts
+
+  const validation = validateState(state);
+  assert.equal(hasAnyErrors(validation), true);
+  assert.ok(validation.kpr[0].supplierName);
+  assert.ok(validation.kpr[0].supplierCountry);
+  assert.ok(validation.kpr[0].supplierVatId);
 });

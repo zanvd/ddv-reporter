@@ -275,6 +275,35 @@ export function validateKprEntry(entry) {
 }
 
 /**
+ * Validates one partner record (plan 0006 §3.1, §5.3); returns a
+ * field-name -> message map keyed name/countryCode/vatId. All three fields
+ * are required for both the add and edit flows — reuses the same rules as
+ * the KIR/KPR identity fields, with no partner-specific carve-out.
+ *
+ * Deliberately not part of validateState()/hasAnyErrors(): partners are
+ * invisible to the DDV_KIR_KPR output and the Download gate (plan §3.2).
+ */
+export function validatePartner(partner) {
+  const errors = {};
+
+  const nameError = validateRequiredText(partner.name);
+  if (nameError) errors.name = nameError;
+
+  const countryCodeError = validateCountryCode(partner.countryCode, { required: true });
+  if (countryCodeError) errors.countryCode = countryCodeError;
+
+  const vatIdError = validateVatId(partner.vatId, { required: true });
+  if (vatIdError) errors.vatId = vatIdError;
+
+  return errors;
+}
+
+/** True if a validatePartner() result contains any field errors. */
+export function hasPartnerErrors(errorMap) {
+  return Object.keys(errorMap).length > 0;
+}
+
+/**
  * Validates the full application state (general section + every KIR/KPR
  * entry). Used as the single Download gate (spec §7/§8) as well as the
  * source for live inline errors.

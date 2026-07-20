@@ -368,12 +368,24 @@ button {
   font-style: italic;
 }
 
+.entry-add-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
 .add-entry-button {
   padding: 0.5rem 1rem;
   border: 1px solid var(--accent);
   border-radius: 4px;
   background: var(--surface);
   color: var(--accent);
+}
+
+.add-entry-button:disabled {
+  border-color: var(--border);
+  color: var(--muted);
+  cursor: not-allowed;
 }
 
 .remove-entry-button {
@@ -400,4 +412,127 @@ button {
 
 #download-message {
   margin-top: 0.5rem;
+}
+
+.message-bubble {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  max-width: 20rem;
+  padding: 0.65rem 1rem;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  font-size: 0.9rem;
+  color: var(--on-accent);
+  z-index: 100;
+}
+
+.message-bubble[hidden] {
+  display: none;
+}
+
+.message-bubble-success {
+  background: var(--success);
+}
+
+.message-bubble-error {
+  background: var(--error);
+}
+
+.partner-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
+}
+
+.partner-add-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.partner-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0.75rem;
+}
+
+.partner-table th,
+.partner-table td {
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+
+.partner-table th {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.partner-table td input,
+.partner-table td select {
+  width: 100%;
+  font: inherit;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.partner-id-cell {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.partner-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.partner-icon-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.partner-icon-button-icon::before {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.partner-save-button .partner-icon-button-icon::before {
+  content: "\2713";
+  color: var(--success);
+}
+
+.partner-save-button:disabled .partner-icon-button-icon::before {
+  color: var(--muted);
+}
+
+.partner-icon-button-icon svg {
+  display: block;
+}
+
+.partner-delete-button .partner-icon-button-icon svg {
+  color: var(--error);
+}
+
+.partner-cancel-button .partner-icon-button-icon::before {
+  content: "\2715";
+  color: var(--error);
 }

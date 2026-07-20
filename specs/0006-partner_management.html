@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DDV Reporter — Partner Management (Partnerji) Specification</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --muted: #5a5a5a;
+    --accent: #0b5c8a;
+    --border: #d5d9dd;
+    --bg-soft: #f6f8fa;
+    --code-bg: #eef1f4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    line-height: 1.55;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 5rem;
+  }
+  h1 { font-size: 1.8rem; line-height: 1.2; margin: 0 0 0.4rem; }
+  h2 {
+    font-size: 1.25rem;
+    margin: 2.4rem 0 0.8rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 2px solid var(--border);
+  }
+  h3 { font-size: 1.05rem; margin: 1.6rem 0 0.6rem; color: var(--accent); }
+  p, li { font-size: 0.95rem; }
+  code {
+    background: var(--code-bg);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85em;
+  }
+  pre {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.65rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--bg-soft); font-weight: 600; }
+  tr:nth-child(even) td { background: #fbfcfd; }
+  .meta {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin: 0.15rem 0;
+  }
+  .meta strong { color: var(--fg); }
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--bg-soft);
+    padding: 0.7rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.9rem;
+  }
+  ul { padding-left: 1.3rem; }
+  a { color: var(--accent); word-break: break-word; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  .sources li { margin-bottom: 0.6rem; }
+</style>
+</head>
+<body>
+
+<h1>DDV Reporter — Partner Management (Partnerji)</h1>
+<p class="meta"><strong>Version:</strong> 1.5 (revised — selecting the placeholder or a stale/removed partner in a
+  partner-backed row's dropdown now clears the row's hidden identity fields to empty, instead of leaving them
+  at whatever they last held)</p>
+<p class="meta"><strong>Date:</strong> 2026-07-19</p>
+<p class="meta"><strong>Status:</strong> Approved — ready for implementation planning</p>
+<p class="meta"><strong>Type:</strong> New feature — data-management / UX convenience layered on the existing KIR/KPR entry.</p>
+<p class="meta"><strong>Scope:</strong> Product / requirements only. No technical, architectural, or implementation decisions.</p>
+<p class="meta"><strong>Builds on:</strong> Spec 0001 (KIR/KPR JSON export — the invoice fields and their format validation),
+  Spec 0002 (local-only persistence model), Spec 0003 (tabbed interface &amp; Pomoč help page), and Spec 0005
+  (last-action-wins transient feedback). All of those remain otherwise unchanged.</p>
+
+<div class="callout">
+  <strong>Not a new VAT rule.</strong> Partner management is a <em>saved-address-book convenience</em> for
+  reusing customer/supplier identity data across invoices. It introduces no new tax logic, no new FURS fields,
+  and no change to how DDV is calculated, serialized, or validated. The partner fields reuse the existing
+  FURS-grounded validation from Spec 0001 (country code, VAT identification number). The DDV_KIR_KPR output
+  format is unchanged: a partner merely supplies values into already-specified fields
+  (<code>P6</code>/<code>P6DS</code> for KIR, <code>P6</code>/<code>P7</code>/<code>P7DS</code> for KPR).
+  Everything stays in the browser — partner data never leaves the device (Spec 0002 privacy property).
+</div>
+
+<h2>1. Summary</h2>
+<p>
+  Add a new <strong>"Partnerji"</strong> tab (positioned second, between "Poročilo" and "Pomoč") that lets the
+  user maintain a saved list of business partners — each with an <strong>id, naziv (name), koda države
+  (country code), and identifikacijska številka za DDV (VAT id)</strong>. Partners are created, edited, and
+  deleted inline in a per-row list, persisted locally in the browser, and surfaced via transient
+  bottom-right message bubbles. On the "Poročilo" tab, the KIR and KPR lists each gain a second add button
+  ("Dodaj izdani/prejeti račun partnerja") that inserts an invoice row whose customer/supplier identity
+  fields are replaced by a single <strong>partner-selection dropdown</strong>, so the user reuses a saved
+  partner instead of re-typing its data. The Pomoč tab gains a "Partnerji" help article, and the report-form
+  instructions gain a short blurb about the two new partner buttons.
+</p>
+
+<h2>2. Background / motivation</h2>
+<p>
+  A VAT payer typically issues to, and receives from, the same recurring customers and suppliers. Re-entering
+  each partner's country code and VAT identification number on every invoice row is repetitive and
+  error-prone. A saved partner list lets the user enter each partner's identity once and then pick it from a
+  dropdown when adding invoices. Because the partner's country code and VAT id map directly onto existing
+  FURS fields (§7), this is purely a data-reuse convenience — it changes nothing about what the DDV_KIR_KPR
+  file contains or how it is validated.
+</p>
+
+<h2>3. Scope</h2>
+<h3>In scope</h3>
+<ul>
+  <li>A new <strong>"Partnerji"</strong> tab, <strong>second in the tab bar</strong> (order:
+    Poročilo, Partnerji, Pomoč) (§4).</li>
+  <li>A <strong>partner list</strong> with inline add / edit / delete, an empty-state message, and an
+    "add" (+) affordance (§5).</li>
+  <li><strong>Local persistence</strong> of partners (create/update/delete), consistent with the app's
+    existing local-only browser storage and privacy property (Spec 0002) (§5.6).</li>
+  <li><strong>Transient bottom-right message bubbles</strong> (success/error, single slot, 3&nbsp;s
+    auto-dismiss) for the three partner actions (§6).</li>
+  <li><strong>Field validation</strong> for partner name, country code, and VAT id, reusing the app's
+    existing rules and inline-error UX (§8).</li>
+  <li><strong>KIR/KPR integration:</strong> a second add button per list that inserts a partner-backed
+    invoice row using a partner-selection dropdown in place of the identity fields (§9), including the
+    decided <strong>selection behavior</strong> (immediate copy of partner data into the row; per-row dropdown
+    snapshot frozen at creation; a persistent inline "Partner ne obstaja." indicator for a stale selection; an
+    "Izberite partnerja." message for a missing selection; partner-backed rows validated by the same
+    optional/required rules as manually-typed rows) (§9.3, §9.4).</li>
+  <li><strong>Help content:</strong> a "Partnerji" article on the Pomoč tab, plus a blurb in the
+    "Poročilo" instructions describing the two new buttons (§10).</li>
+</ul>
+<h3>Out of scope</h3>
+<ul>
+  <li><strong>Pagination, filtering, sorting controls, or search</strong> over partners (list is always the
+    full set, ordered by id ascending).</li>
+  <li>Any change to the <strong>DDV_KIR_KPR output format, FURS fields, serialization, or the invoice
+    validation rules</strong> themselves (Spec 0001 unchanged).</li>
+  <li><strong>Deduplication / uniqueness enforcement</strong> across partners (two partners with the same
+    VAT id, or the same name, are allowed) — not required in this version (§11).</li>
+  <li><strong>Import/export of the partner list</strong>, sync across browsers/devices, or any server
+    interaction (nothing leaves the browser).</li>
+</ul>
+
+<h2>4. Tab placement &amp; navigation</h2>
+<ul>
+  <li>The tab bar gains a third tab. Order becomes: <strong>Poročilo</strong> (first),
+    <strong>Partnerji</strong> (second), <strong>Pomoč</strong> (third).</li>
+  <li>Tab label (Slovenian, fixed): <strong>"Partnerji"</strong>.</li>
+  <li><strong>Default tab on load stays "Poročilo".</strong> No deep-linking / URL persistence of the
+    selected tab (consistent with Spec 0003).</li>
+  <li>Tab switching is <strong>state-preserving</strong> (show/hide, never a reset): switching away from and
+    back to "Partnerji" preserves the list, any in-progress new/edited row, and its validation state — the
+    same guarantee Spec 0003 gives "Poročilo". Likewise, switching to "Partnerji" and back must not disturb
+    the "Poročilo" form.</li>
+  <li>Tabs remain keyboard-operable and expose the selected state to assistive technology, exactly as
+    established in Spec 0003 (the existing tab mechanism simply gains one more tab).</li>
+</ul>
+
+<h2>5. Partner list (Partnerji tab)</h2>
+
+<h3>5.1 Layout</h3>
+<ul>
+  <li>The panel opens with an <strong>in-panel section heading</strong>, the fixed
+    <code>&lt;h2&gt;Partnerji&lt;/h2&gt;</code>, matching the per-section <code>&lt;h2&gt;</code> landmark
+    pattern established in Spec 0003 (the Poročilo panel carries "Glava", "Izdani računi (KIR)", and "Prejeti
+    računi (KPR)"; the Pomoč panel carries its help-article headings such as "Pomnenje"). The heading text is
+    the fixed Slovenian string <strong>"Partnerji"</strong> — the same word as the tab label (§4).</li>
+  <li>Below the heading, the tab shows a <strong>list of saved partners, ordered by id ascending</strong>.</li>
+  <li>Each partner is a <strong>row</strong> with these columns, left to right. The four column headers are the
+    fixed literal strings <strong>"ID"</strong>, <strong>"Naziv"</strong>, <strong>"Koda države"</strong>,
+    <strong>"ID za DDV"</strong>, then <strong>two unlabeled (nameless) columns</strong> for the row-scoped
+    <em>save</em> button and the row-scoped <em>delete</em> button. <strong>"ID za DDV"</strong> is the visible
+    (abbreviated) header for the VAT-identification-number column; its full accessible label remains
+    <strong>"Identifikacijska številka za DDV (brez kode države)"</strong>, kept available for the field's
+    <code>aria-label</code> / tooltip and for validation-rule naming (§7). No other column header is
+    abbreviated.</li>
+  <li>All column headers / field labels are <strong>Slovenian</strong> (§7).</li>
+  <li>At the <strong>top-right of the list</strong> sits a <strong>"+" icon button</strong> to add a new
+    partner (§5.5). Its accessible name is the fixed <code>aria-label="Dodaj partnerja"</code>. Exact styling
+    is left to implementation, but it must be a clearly actionable icon button.</li>
+</ul>
+
+<h3>5.2 Empty state</h3>
+<ul>
+  <li>When no partners exist, the list area shows the message: <strong>"Brez shranjenih partnerjev."</strong></li>
+  <li>The "+" add button remains present and usable in the empty state.</li>
+</ul>
+
+<h3>5.3 Fields &amp; editability</h3>
+<ul>
+  <li>A partner record consists of exactly four fields: <strong>id, naziv, koda države, identifikacijska
+    številka za DDV</strong>.</li>
+  <li><strong>id is never editable</strong> and is never entered by the user — it is assigned by the app
+    (§5.5). It is displayed read-only in the ID column.</li>
+  <li><strong>naziv, koda države, and identifikacijska številka za DDV are inline-editable</strong> form
+    fields directly in the row:
+    <ul>
+      <li><strong>Naziv</strong> — text input.</li>
+      <li><strong>Koda države</strong> — the app's standard country dropdown (same control and option set as
+        the KIR/KPR country field; emits ISO country codes, offers Greece once and emits <code>GR</code>).</li>
+      <li><strong>Identifikacijska številka za DDV</strong> — text input.</li>
+    </ul>
+  </li>
+  <li>All three editable fields are <strong>required</strong>, for both add and edit flows (§8).</li>
+</ul>
+
+<h3>5.4 Row-scoped save &amp; delete buttons</h3>
+<table>
+  <thead>
+    <tr><th>Button</th><th>Icon &amp; accessible name</th><th>Enabled when</th><th>On click</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Save</strong> (existing/edited row)</td>
+      <td>Green checkmark; icon-only, accessible name <code>aria-label="Posodobi partnerja"</code></td>
+      <td><strong>Disabled unless that row has an unsaved edit</strong> — i.e. at least one of the row's
+        editable fields differs from the currently persisted value. A freshly loaded, unmodified row has its
+        save button disabled.</td>
+      <td>Validates the row; if valid, persists the update and shows <strong>"Partner posodobljen"</strong>
+        (§6). If invalid, reveals the row's field errors and does not persist (§8).</td>
+    </tr>
+    <tr>
+      <td><strong>Delete</strong> (existing row)</td>
+      <td>Red bin; icon-only, accessible name <code>aria-label="Odstrani partnerja"</code></td>
+      <td><strong>Always enabled.</strong></td>
+      <td>Removes the partner from storage and the list, and shows <strong>"Partner odstranjen"</strong>
+        (§6). No confirmation dialog in this version.</td>
+    </tr>
+  </tbody>
+</table>
+<p>Both buttons are <strong>scoped to their own row</strong> (act only on that partner). The two columns
+  holding them are headerless; because both are icon-only controls, each carries the fixed
+  <code>aria-label</code> given above as its accessible name.</p>
+
+<h3>5.5 Adding a partner (the "+" flow)</h3>
+<ul>
+  <li>Clicking <strong>"+"</strong> <strong>scrolls the list into view</strong> (if not already visible) and
+    <strong>appends a new empty row</strong>: all fields blank — including the normally read-only ID column,
+    which is blank until the partner is saved and its id assigned.</li>
+  <li>The new row's two action buttons differ from a saved row: a <strong>green checkmark save</strong>
+    button (icon-only, accessible name <code>aria-label="Shrani partnerja"</code>) and, in place of the bin,
+    a <strong>red "x" cancel</strong> button (icon-only, accessible name
+    <code>aria-label="Prekliči dodajanje partnerja"</code>).</li>
+  <li><strong>Cancel</strong> on a new, unsaved row simply <strong>removes that row</strong> — no storage
+    interaction, no message.</li>
+  <li><strong>Save</strong> on a new row validates all three fields (§8). If valid: the partner is persisted
+    with a newly assigned id, the <strong>id now appears in the row's ID column</strong>, the message
+    <strong>"Partner dodan"</strong> is shown (§6), and the row's buttons <strong>revert to the normal saved
+    state</strong> — the checkmark becomes the edit/update save button (now disabled until the next edit),
+    and the cancel "x" becomes the normal red bin delete button. Their accessible names switch accordingly,
+    from <code>aria-label="Shrani partnerja"</code> / <code>aria-label="Prekliči dodajanje partnerja"</code>
+    to <code>aria-label="Posodobi partnerja"</code> / <code>aria-label="Odstrani partnerja"</code> (§5.4). If
+    invalid, the row's field errors are revealed and nothing is persisted.</li>
+  <li><strong>Save-button enabled state for a new row:</strong> unlike an existing row (whose save is gated
+    on having an unsaved edit), a new row's save button is <strong>enabled immediately</strong>. Clicking it
+    on an all-blank row therefore reveals the required-field errors, mirroring the report form's
+    reveal-on-submit behavior. <em>(Decision — confirm; see §12.)</em></li>
+  <li><strong>Only one unsaved new row at a time:</strong> while an unsaved new-partner row is present,
+    clicking "+" again does <strong>not</strong> add another row — it just scrolls to the existing unsaved
+    row.</li>
+</ul>
+
+<h3>5.6 Id assignment &amp; persistence</h3>
+<ul>
+  <li>Ids are <strong>positive integers starting at 1</strong>, assigned by the app, never entered or edited
+    by the user.</li>
+  <li>On <strong>page load</strong>, the app determines the <strong>last-used id</strong> from the stored
+    partners; each newly added partner gets <strong>last-used&nbsp;+&nbsp;1</strong>. If no partners are
+    stored, the first added partner gets id <strong>1</strong>.</li>
+  <li>Partner create, update, and delete are each <strong>persisted to the app's local browser storage</strong>,
+    consistent with the existing local-only persistence model (Spec 0002): the data stays in this browser on
+    this device and never leaves it. <em>(How storage is keyed/structured is an implementation decision, not
+    specified here.)</em></li>
+  <li><strong>Id reuse note:</strong> because the last-used id is recomputed from the stored partners at each
+    load, deleting the highest-id partner and reloading could let that id be assigned again to a later
+    partner. This is acceptable for this version (ids are internal identifiers, not report data). Flagged so
+    the implementation plan is aware, not to be "fixed" here.</li>
+</ul>
+
+<h2>6. Messages (bottom-right bubble)</h2>
+<p>
+  The three partner actions each produce a transient message. Unlike the existing inline form messages, these
+  render as a <strong>bubble in the bottom-right of the content window</strong>, colored by class
+  (success vs. error background).
+</p>
+<ul>
+  <li><strong>Single shared slot — no stacking.</strong> At most one bubble is visible at a time. A new
+    message <strong>immediately replaces</strong> any currently showing one (last-action-wins, consistent
+    with Spec 0005's shared-feedback model). Rationale: these messages carry no critical information, so a
+    newer one simply supersedes an older one rather than queueing or stacking to fill the screen.</li>
+  <li><strong>Auto-dismiss after 3&nbsp;seconds</strong> (reuse the existing 3000&nbsp;ms feedback duration).
+    Replacing a bubble restarts the timer.</li>
+  <li>Bubbles are announced to assistive technology (a live region), consistent with existing transient
+    feedback.</li>
+</ul>
+<table>
+  <thead>
+    <tr><th>Action</th><th>Outcome</th><th>Class</th><th>Message (Slovenian, fixed)</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Add partner</td><td>Success</td><td>success</td><td>Partner dodan</td></tr>
+    <tr><td>Add partner</td><td>Failure</td><td>error</td><td>Pri dodajanju partnerja je prišlo do napake.</td></tr>
+    <tr><td>Update partner</td><td>Success</td><td>success</td><td>Partner posodobljen</td></tr>
+    <tr><td>Update partner</td><td>Failure</td><td>error</td><td>Pri posodabljanju partnerja je prišlo do napake.</td></tr>
+    <tr><td>Delete partner</td><td>Success</td><td>success</td><td>Partner odstranjen</td></tr>
+    <tr><td>Delete partner</td><td>Failure</td><td>error</td><td>Pri odstranjevanju partnerja je prišlo do napake.</td></tr>
+  </tbody>
+</table>
+<p>
+  The three error strings are the concrete resolution of the requester's single template
+  ("Pri dodajanju/posodabljanju/odstranjevanju je prišlo do napake") into one message per action, in the
+  app's report-form tone. A "failure" here means the underlying persistence operation reported failure
+  (storage unavailable / write blocked, as storage can return failure per Spec 0002); it is distinct
+  from a <em>validation</em> failure, which never reaches storage and instead reveals inline field errors
+  (§8) with no bubble.
+</p>
+
+<h2>7. User-facing field labels &amp; FURS mapping</h2>
+<p>All partner-list labels are <strong>Slovenian</strong>, aligned with FURS "Naziv polja" terminology used
+  elsewhere in the app. A partner's <em>id</em> is app-internal and has no FURS field. The other three fields
+  map onto the already-specified DDV_KIR_KPR invoice fields when a partner is applied to an invoice (§9):</p>
+<table>
+  <thead>
+    <tr><th>Partner field</th><th>Column header / label (Slovenian)</th><th>FURS field when applied to KIR</th><th>FURS field when applied to KPR</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>id</td><td>ID</td><td>— (app-internal; not serialized)</td><td>— (app-internal; not serialized)</td></tr>
+    <tr>
+      <td>name</td><td>Naziv</td>
+      <td>— (KIR has no customer-name field; used only as the dropdown label)</td>
+      <td><code>P6</code> — "Firma / ime in sedež dobavitelja"</td>
+    </tr>
+    <tr>
+      <td>country code</td><td>Koda države</td>
+      <td><code>P6</code> — "Koda države kupca"</td>
+      <td><code>P7</code> — "Koda države dobavitelja"</td>
+    </tr>
+    <tr>
+      <td>VAT id</td>
+      <td>Visible header: <strong>"ID za DDV"</strong> (abbreviated). Full accessible label:
+        "Identifikacijska številka za DDV (brez kode države)"</td>
+      <td><code>P6DS</code> — "Identifikacijska številka kupca za DDV"</td>
+      <td><code>P7DS</code> — "Identifikacijska številka dobavitelja za DDV"</td>
+    </tr>
+  </tbody>
+</table>
+<p>
+  Note the asymmetry: a KIR (issued-invoice) row has no customer-name field in the FURS format, so a
+  partner's <strong>naziv is used only as the human-readable dropdown label</strong> for KIR rows and is not
+  serialized. For KPR (received-invoice) rows the naziv <em>is</em> the supplier name (<code>P6</code>). The
+  country code and VAT id are serialized for both. The VAT-id column is the only abbreviated header: its
+  visible text is the fixed string <strong>"ID za DDV"</strong>, while its full accessible label —
+  <strong>"Identifikacijska številka za DDV (brez kode države)"</strong> — must remain available as the
+  field's label / <code>aria-label</code> / tooltip and as the validation-rule name. No other column header is
+  abbreviated.
+</p>
+
+<h2>8. Validation &amp; inline-error UX</h2>
+<ul>
+  <li>Partner fields reuse the app's <strong>existing validation rules</strong> (the single source of truth
+    in <code>validate.js</code>), same as the KIR/KPR identity fields:
+    <ul>
+      <li><strong>Naziv</strong> — required; non-empty; max 250 characters (the app's standard required-text
+        rule).</li>
+      <li><strong>Koda države</strong> — required; must be a recognized country code (EU member state, SI,
+        or XI), per the app's country-code rule.</li>
+      <li><strong>Identifikacijska številka za DDV</strong> — required; max 25 characters; entered
+        <strong>without</strong> the leading country-code prefix (no "SI" prefix), per the app's VAT-id rule.</li>
+    </ul>
+    All three are <strong>required for both add and edit</strong>.</li>
+  <li><strong>Inline-error UX matches the report form</strong> (CLAUDE.md validation-UX convention):
+    a field's error is <strong>quiet until that field is touched</strong> (input/change or blur), and the
+    row's <strong>save-button click acts as the row's submit gate</strong>, revealing <em>all</em> remaining
+    errors in that row at once (analogous to how the Download button reveals every error in the report
+    form). Errors display in the same inline style as existing form fields.</li>
+  <li>A row with any field error <strong>cannot be saved</strong> (no persistence, no success bubble); the
+    errors are revealed instead. This applies equally to a new row and an edited existing row.</li>
+</ul>
+<div class="callout">
+  <strong>Consistency note (country/VAT pairing).</strong> In the report form, KIR's customer country + VAT
+  id are an <em>optional pair</em> (both or neither), while a partner always requires both. Because a
+  partner-backed KIR row always carries both a country and a VAT id, it inherently satisfies the KIR pairing
+  rule — the partner cannot produce a half-filled pair.
+</div>
+
+<h2>9. KIR/KPR report-form integration</h2>
+
+<h3>9.1 New per-list "add partner invoice" buttons</h3>
+<ul>
+  <li>The KIR list and the KPR list each gain a <strong>second add button</strong>, positioned to the
+    <strong>right of the existing "new receipt" button</strong> in that list:
+    <table>
+      <thead><tr><th>List</th><th>Existing button</th><th>New partner button (Slovenian, fixed)</th></tr></thead>
+      <tbody>
+        <tr><td>KIR (izdani računi)</td><td>Dodaj izdani račun</td><td><strong>Dodaj izdani račun partnerja</strong></td></tr>
+        <tr><td>KPR (prejeti računi)</td><td>Dodaj prejeti račun</td><td><strong>Dodaj prejeti račun partnerja</strong></td></tr>
+      </tbody>
+    </table>
+  </li>
+  <li>Each new button is <strong>disabled when there are no saved partners</strong>, and enabled when at
+    least one saved partner exists. Its enabled state reflects the current saved-partner set (so adding the
+    first partner on the Partnerji tab enables these buttons when the user returns to Poročilo).</li>
+</ul>
+
+<h3>9.2 Partner-backed invoice row</h3>
+<ul>
+  <li>Clicking a partner button adds a new KIR/KPR invoice row that differs from a normal row: the
+    <strong>identity fields are hidden and replaced by a single partner-selection dropdown</strong>:
+    <ul>
+      <li><strong>KIR:</strong> hide <em>Koda države kupca</em> (<code>P6</code>) and <em>Identifikacijska
+        številka kupca za DDV</em> (<code>P6DS</code>); show the partner dropdown instead.</li>
+      <li><strong>KPR:</strong> hide <em>Firma / ime in sedež dobavitelja</em> (<code>P6</code>),
+        <em>Koda države dobavitelja</em> (<code>P7</code>), and <em>Identifikacijska številka dobavitelja
+        za DDV</em> (<code>P7DS</code>); show the partner dropdown instead.</li>
+    </ul>
+  </li>
+  <li>Selecting a partner <strong>immediately populates the row's hidden identity fields</strong> with a copy
+    of that partner's current data; from that point the row holds its own independent copy, not a live
+    reference to the partner record (§9.4).</li>
+  <li>All <strong>other invoice fields</strong> (dates, document number, net value, VAT amounts, KPR flat
+    rate, etc.) behave exactly as in a normal row.</li>
+  <li>A partner-backed row and a normal row may coexist freely in the same list; the report output is a
+    single combined KIR/KPR list as today.</li>
+</ul>
+
+<h3>9.3 Partner dropdown</h3>
+<ul>
+  <li>The dropdown <strong>displays partner names as the option labels</strong> and uses <strong>partner ids
+    as the underlying values</strong>.</li>
+  <li>It offers the same placeholder option as the app's country dropdown — the fixed string
+    <strong>"— izberite —"</strong>. There is <strong>no separate "a partner must be selected" required
+    rule</strong> that changes what blocks download: a partner-backed row is gated entirely through its hidden
+    identity fields, under the <em>exact same</em> optional/required rules as a manually-typed row (§9.4). A
+    partner-backed KIR row with nothing selected has both customer country and VAT id blank — a valid optional
+    pair, exactly like a typed KIR row left blank; a partner-backed KPR row with nothing selected has blank
+    supplier fields — which already fails KPR's unconditional required-field rules, exactly like a typed KPR
+    row left blank. No new gating rule either way.</li>
+  <li><strong>Re-selecting the placeholder clears the row.</strong> If the user selects the placeholder
+    ("— izberite —") on a partner-backed row whose hidden identity fields currently hold data (copied from an
+    existing partner, or left over from a prior selection), those hidden fields are <strong>cleared to
+    empty</strong> and any "Partner ne obstaja." indicator is cleared. The row then behaves exactly like a
+    freshly added, never-touched partner-backed row (§9.4).</li>
+  <li><strong>Missing partner selection → "Izberite partnerja."</strong> When a partner-backed row is blocked
+    by the Download gate because no valid partner has been selected (a KPR row whose supplier fields are
+    consequently blank), the error message displayed next to that row's dropdown is the fixed Slovenian string
+    <strong>"Izberite partnerja."</strong> — shown in place of the hidden identity fields' own error text
+    (§9.4). It follows the app's standard field-error convention (quiet until touched, revealed together by
+    the Download gate). Exactly how and where this message is wired is an <strong>implementation detail</strong>.
+    (For a KIR row, both-blank customer identity is a valid optional pair, so a missing selection does not
+    block download and this message does not appear — consistent with a typed KIR row left blank.)</li>
+  <li><strong>The option list is a point-in-time snapshot frozen when the row is created</strong> (via the
+    "Dodaj … partnerja" button), built from the saved-partner set as it stands at that moment. It is
+    <strong>never re-synced</strong> when partners are subsequently added, edited, or removed on the Partnerji
+    tab. Consequences: an older row may keep offering (and displaying as its selected value) an option for a
+    partner that has since been removed or renamed; and a partner added after a row was created does not appear
+    in that row's dropdown. A newly added partner-backed row always gets a fresh snapshot of the current set
+    (§9.4, §11).</li>
+  <li><strong>Selecting a partner that no longer exists → persistent inline "Partner ne obstaja."</strong>
+    Because the option list is frozen, it may still offer a partner that has since been removed. If the user
+    selects such a stale option, a <strong>persistent inline error</strong> —
+    <strong>"Partner ne obstaja."</strong> — is shown next to that row's dropdown and <strong>stays visible
+    until the user selects a different, currently-existing partner</strong>. It does <em>not</em> auto-dismiss
+    on a timer; this is a <strong>per-row inline indicator</strong>. It is a live UI-level check —
+    "does this row's selected partner id still exist in the current partner list?" — computed
+    <strong>independently of the Download-gate field-error logic</strong>; it is <em>not</em> a
+    <code>validate.js</code> field error (no change to the entry validators' signatures), and it does not by
+    itself gate the Download button (§9.4). Selecting a stale option <strong>clears the row's hidden identity
+    fields to empty</strong> — exactly like re-selecting the placeholder, above — rather than repopulating them
+    from the removed partner's last-known data or leaving them at whatever they previously held.</li>
+  <li>Label (Slovenian): <strong>"Partner"</strong>.</li>
+</ul>
+
+<h3>9.4 Partner data → invoice fields (decided: immediate copy, validated as a normal row)</h3>
+<ul>
+  <li><strong>On selection, copy immediately.</strong> The moment an <em>existing</em> partner is chosen in a
+    partner-backed row's dropdown, that partner's <strong>current</strong> country code and VAT id — and, for
+    KPR, its name — are copied into the row's hidden identity fields (the FURS fields of §7). From that point
+    the row holds its <strong>own independent copy</strong> of those values, not a live reference to the
+    partner record. Selecting the placeholder or a stale/removed partner instead <strong>clears</strong> the
+    row's hidden identity fields to empty — any previously copied data is discarded, not retained (§9.3).</li>
+  <li><strong>Hidden fields are what get serialized and validated.</strong> Building the DDV_KIR_KPR JSON and
+    the Download-gate validation both operate on the row's hidden identity fields, using the <em>exact same</em>
+    optional/required rules as a manually-typed row — <strong>no partner-specific carve-out and no separate
+    "a partner has been selected" gating rule</strong>. If those hidden fields fail (a partner-backed KPR row
+    whose supplier fields are still blank because a valid partner was never selected), the Download gate
+    blocks exactly as it would for a typed row; if they pass (a partner-backed KIR row left blank — a valid
+    both-blank pair), it does not block.</li>
+  <li><strong>The row shows a single dropdown-level message, never the hidden fields' own error text.</strong>
+    A partner-backed row's hidden identity fields are not rendered, so their own validation error text is
+    <strong>never surfaced</strong>. Instead, at most one message appears next to the dropdown: if a
+    <strong>"Partner ne obstaja."</strong> indicator is showing (a stale option was selected, §9.3), that
+    message remains; otherwise, when the row is blocked for want of a valid selection, the message is
+    <strong>"Izberite partnerja."</strong> (§9.3). The exact wiring of these messages is an implementation
+    detail.</li>
+  <li><strong>The "Partner ne obstaja." indicator does not itself gate download.</strong> It is the live
+    UI-level check of §9.3, computed independently of the Download gate; whether the row blocks download is
+    decided purely by the (now-cleared) hidden fields' normal validation. Because selecting a stale option
+    clears those fields (§9.3), a <strong>KIR</strong> row showing the indicator has a blank customer-identity
+    pair — a valid optional pair (§9.4) — so the report downloads despite the indicator showing; a
+    <strong>KPR</strong> row showing the indicator has blank required supplier fields, so the Download gate
+    blocks it, with the visible message staying "Partner ne obstaja." (message precedence, above).</li>
+  <li><strong>Independent of later partner deletion.</strong> Because the row carries its own copy, deleting
+    the partner from the Partnerji tab afterward <strong>does not affect an already-populated, untouched
+    row</strong>: the report downloads normally with <strong>no error</strong>, and the serialized
+    DDV_KIR_KPR output comes from the row's copied data, not from a live partner lookup at download time.</li>
+  <li><strong>Independent of later partner edits.</strong> By the same rule, editing a partner after a row has
+    copied its data does not retroactively change that row (the row keeps its copied snapshot). Re-selecting
+    the same still-existing partner re-copies its then-current data.</li>
+  <li><strong>New rows reflect the current set.</strong> A partner-backed row added <em>after</em> a deletion
+    builds its dropdown from the current (post-deletion) partner set, so a deleted partner is never offered as
+    a choice in a row created afterward (§9.3, §11).</li>
+</ul>
+
+<h2>10. Help content</h2>
+<h3>10.1 New "Partnerji" article on the Pomoč tab</h3>
+<p>Add a new help article (heading <strong>"Partnerji"</strong>) under the existing Pomoč content, describing
+  the tab end-to-end in plain terms. Fixed Slovenian copy:</p>
+<pre>V zavihku Partnerji lahko shranite pogoste poslovne partnerje (kupce in dobavitelje), da vam pri vnosu računov ni potrebno vsakič znova vpisovati njihovih podatkov. Za vsakega partnerja se shranijo naziv, koda države in identifikacijska številka za DDV.
+
+Novega partnerja dodate s klikom na gumb »+« v zgornjem desnem kotu seznama. Prikaže se nova vrstica, v katero vnesete partnerjeve podatke. Vnos potrdite z zeleno kljukico, z rdečim »x« pa ga prekličete. Vsa tri polja so obvezna; koda države in identifikacijska številka za DDV morata biti veljavni.
+
+Obstoječega partnerja uredite tako, da spremenite vrednost v njegovi vrstici in spremembo potrdite z zeleno kljukico. Partnerja odstranite z rdečo ikono koša.
+
+Podatki o partnerjih se shranijo le v vašem brskalniku in nikoli ne zapustijo vaše naprave.
+
+Shranjene partnerje lahko nato pri vnosu izdanih (KIR) in prejetih (KPR) računov izberete iz spustnega seznama, namesto da bi njihove podatke vnašali ročno.</pre>
+
+<h3>10.2 Blurb in the "Poročilo" instructions</h3>
+<p>Add a short sentence to the report-form instructions (the <code>.app-intro</code> paragraph) describing the
+  two new buttons. Fixed Slovenian copy (appended to the existing intro):</p>
+<pre>Če ste v zavihku Partnerji shranili poslovne partnerje, lahko v razdelku Izdani računi (KIR) uporabite gumb »Dodaj izdani račun partnerja«, v razdelku Prejeti računi (KPR) pa gumb »Dodaj prejeti račun partnerja«, in partnerja preprosto izberete iz spustnega seznama, namesto da bi njegove podatke vnašali ročno.</pre>
+
+<h2>11. Edge cases</h2>
+<table>
+  <thead>
+    <tr><th>Case</th><th>Expected handling</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>No partners saved</td>
+      <td>Partnerji list shows "Brez shranjenih partnerjev."; the two KIR/KPR partner buttons are disabled.</td>
+    </tr>
+    <tr>
+      <td>Cancel on a new (unsaved) partner row</td>
+      <td>Row is removed; no storage change, no message, no id consumed beyond what §5.6 already implies.</td>
+    </tr>
+    <tr>
+      <td>"+" clicked while an unsaved new row already exists</td>
+      <td>No second new row is added; the app scrolls to the existing unsaved row.</td>
+    </tr>
+    <tr>
+      <td>Save clicked on a row with invalid/blank required fields</td>
+      <td>Row's field errors are revealed inline; nothing is persisted; no success bubble.</td>
+    </tr>
+    <tr>
+      <td>Persistence operation reports failure (storage blocked/unavailable)</td>
+      <td>Show the action-specific error bubble (§6); the list reflects reality (the change did not persist).
+        Exact in-memory rollback behavior is an implementation detail, but the user must not be told an
+        action succeeded when it did not.</td>
+    </tr>
+    <tr>
+      <td>Two partners with identical name (or identical VAT id)</td>
+      <td>Allowed — no uniqueness enforcement in this version. Distinct ids keep them addressable; the
+        dropdown may show duplicate labels (acceptable for now).</td>
+    </tr>
+    <tr>
+      <td>Editing an existing row but reverting the value back to the saved value</td>
+      <td>Save button returns to disabled (no net unsaved edit). Exact change-detection is an implementation
+        detail; the product rule is "enabled only while an unsaved change exists".</td>
+    </tr>
+    <tr>
+      <td><strong>Partner-backed row whose dropdown was never touched, at download</strong></td>
+      <td>Validated exactly like a manually-typed row with those identity fields left blank — no special
+        "a partner must be selected" gating rule. A <strong>KIR</strong> row: customer country + VAT id both
+        blank is a valid optional pair, so it does not block download (no message). A <strong>KPR</strong> row:
+        blank supplier fields fail KPR's existing unconditional required-field rules, so it blocks download —
+        and the message shown next to the dropdown is <strong>"Izberite partnerja."</strong>, not the hidden
+        fields' own error text (§9.3, §9.4).</td>
+    </tr>
+    <tr>
+      <td><strong>User selects a stale/removed partner option in a row's frozen dropdown</strong></td>
+      <td>A <strong>persistent inline error "Partner ne obstaja."</strong> is shown next to that row's dropdown
+        and stays until the user selects a different, currently-existing partner (§9.3). It does not
+        auto-dismiss. The stale pick <strong>clears the row's hidden identity fields to empty</strong>,
+        discarding any previously copied data. The indicator does not by itself block the Download gate — only
+        the hidden fields' normal validation does (§9.4): for a <strong>KIR</strong> row the now-blank pair is
+        valid (no block), for a <strong>KPR</strong> row the now-blank required fields block download.</td>
+    </tr>
+    <tr>
+      <td><strong>User re-selects the placeholder on a row that previously held a valid or stale
+        selection</strong></td>
+      <td>The row's hidden identity fields are <strong>cleared to empty</strong> and any "Partner ne obstaja."
+        indicator is cleared (§9.3). The row then behaves exactly like a freshly added, never-touched
+        partner-backed row: a <strong>KIR</strong> row is a valid blank pair (no block, no message); a
+        <strong>KPR</strong> row blocks download with "Izberite partnerja." shown at the dropdown (§9.3,
+        §9.4).</td>
+    </tr>
+    <tr>
+      <td><strong>Download clicked while a row shows "Partner ne obstaja." and its hidden fields fail
+        validation</strong></td>
+      <td>The Download gate blocks on the hidden identity fields under the normal optional/required rules (no
+        partner-specific carve-out). The hidden fields' own error text is not shown; the already-visible
+        <strong>"Partner ne obstaja."</strong> message remains the row's visible message (§9.4).</td>
+    </tr>
+    <tr>
+      <td><strong>A partner-backed row's partner is deleted from the Partnerji tab before download (row left
+        untouched)</strong></td>
+      <td><strong>Downloads fine, no error.</strong> The row already holds its own copy of the partner's
+        identity data (§9.4), so the deletion does not affect it; the DDV_KIR_KPR output is produced from the
+        row's copied values. The row's frozen dropdown is not re-synced, so it may still display the deleted
+        partner as its selected value — but as long as the user does not re-select it, no indicator appears.</td>
+    </tr>
+    <tr>
+      <td><strong>A new partner-backed row is added after a partner deletion</strong></td>
+      <td>Its dropdown is built fresh from the current (post-deletion) partner set, so the deleted partner is
+        never offered as a choice in a row created afterward (§9.3, §9.4).</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>12. Open questions</h2>
+<ol>
+  <li><strong>New-row save enabled state — confirmed.</strong> §5.5's behavior (save button enabled
+    immediately; clicking it on a blank row reveals required-field errors, matching the report form) is
+    confirmed as final.</li>
+  <li><strong>KIR/KPR partner-selection behavior — resolved (no longer open).</strong> Simplified model:
+    selecting an existing partner copies its data into the row's hidden identity fields immediately, and those
+    hidden fields are what get serialized and validated (§9.4); the per-row dropdown is a snapshot frozen at
+    row-creation and never re-synced (§9.3); selecting a stale/removed option <em>clears</em> the row's hidden
+    identity fields to empty and shows a <em>persistent</em> per-row inline error "Partner ne obstaja." that
+    stays until a currently-existing partner is picked (§9.3) — re-selecting the placeholder likewise clears
+    the fields and any indicator (§9.3); a missing selection that blocks the Download gate shows "Izberite
+    partnerja." next to the dropdown (§9.3,
+    §9.4); and partner-backed rows use the <em>identical</em> optional/required validation rules as
+    manually-typed rows — no partner-specific carve-out (§9.4). The "Partner ne obstaja." indicator is a live
+    UI-level check, not a <code>validate.js</code> field error, so the entry validators keep their existing
+    single-argument shape.</li>
+  <li><strong>Visible feedback for a partner-backed row blocked without a "Partner ne obstaja." indicator —
+    resolved.</strong> When a partner-backed row is blocked by the Download gate because no valid partner is
+    selected (a never-touched KPR row with blank supplier fields), the message displayed next to the dropdown
+    is the fixed string <strong>"Izberite partnerja."</strong> (§9.3, §9.4), shown in place of the hidden
+    fields' own error text. Its exact wiring is an implementation detail.</li>
+</ol>
+
+<h2>13. References / notes</h2>
+<p>
+  Partner management is a <strong>data-management / UX convenience feature</strong>. It introduces no new tax
+  semantics: the partner fields reuse the country-code and VAT-identification-number validation already
+  established (and FURS-grounded) in Spec 0001, and a partner only supplies values into the existing
+  DDV_KIR_KPR fields (<code>P6</code>/<code>P6DS</code> for KIR; <code>P6</code>/<code>P7</code>/<code>P7DS</code>
+  for KPR). Accordingly there is no <em>new</em> external FURS / ZDDV-1 dependency to research for the
+  behavior specified here — the relevant FURS field definitions and validation rules are those already cited
+  in Spec 0001. The relevant references are internal:
+</p>
+<ul>
+  <li><strong>Spec 0001 — VAT records KIR/KPR JSON export</strong>
+    (<code>specs/0001-vat_records_kir_kpr_json_export.html</code>): defines the KIR/KPR fields, the
+    <code>P6</code>/<code>P6DS</code>/<code>P7</code>/<code>P7DS</code> mapping, and the country-code /
+    VAT-id validation rules the partner fields reuse.</li>
+  <li><strong>Spec 0002 — Persist general (Glava) data</strong>
+    (<code>specs/0002-persist_general_data.html</code>): defines the local-only browser-storage model and
+    privacy property (nothing leaves the browser) that partner persistence follows, and the failure-return
+    behavior of the storage layer.</li>
+  <li><strong>Spec 0003 — Tabbed interface &amp; Pomoč help page</strong>
+    (<code>specs/0003-tabbed_interface_help_page.html</code>): defines the tab bar, state-preserving tab
+    switching, the per-section <code>&lt;h2&gt;</code> heading pattern, and the Pomoč help-article structure
+    that the new "Partnerji" tab, its in-panel heading, and its help article extend.</li>
+  <li><strong>Spec 0005 — Last-action-wins transient feedback</strong>
+    (<code>specs/0005-fix_forget_button_relocation.html</code>): the single-slot, last-action-wins,
+    3-second transient-message model reused by the bottom-right message bubbles (§6).</li>
+  <li><strong>Project conventions</strong> (repo-root <code>CLAUDE.md</code>): all user-facing text is
+    Slovenian using FURS "Naziv polja" terminology; <code>validate.js</code> is the single source of truth
+    for field errors; validation is quiet-until-touched with a reveal-all gate; KISS/YAGNI (no pagination,
+    search, uniqueness, or import/export in this version).</li>
+</ul>
+
+</body>
+</html>

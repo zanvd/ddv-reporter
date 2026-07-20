@@ -26,7 +26,13 @@ function buildLabel(id, labelText) {
   return label;
 }
 
-function buildErrorText(id) {
+/**
+ * Builds a field's inline error paragraph: `role="alert"`, id `{id}-error`
+ * (the target of the field's `aria-describedby`). Shared by every view that
+ * needs a standalone error slot outside a full buildFieldGroup() trio (e.g.
+ * view/partnerList.js's table cells).
+ */
+export function buildErrorText(id) {
   const error = document.createElement('p');
   error.className = 'field-error';
   error.id = `${id}-error`;
@@ -62,7 +68,13 @@ function buildDateInput(id, value) {
   return input;
 }
 
-function buildCountrySelect(id, value) {
+/**
+ * Builds the shared country `<select>` (the same control/option set as the
+ * KIR/KPR country fields): a "— izberite —" placeholder plus one option per
+ * COUNTRIES entry, emitting ISO codes as values. Reused as-is by
+ * view/partnerList.js for the "Koda države" column (plan 0006 §5.4).
+ */
+export function buildCountrySelect(id, value) {
   const select = document.createElement('select');
   select.id = id;
   select.name = id;
@@ -82,6 +94,64 @@ function buildCountrySelect(id, value) {
 
   select.value = value ?? '';
   return select;
+}
+
+/**
+ * Builds the "Partner" dropdown `<select>` for a partner-backed KIR/KPR row
+ * (plan 0006 §5.6/§9.3): the same "— izberite —" placeholder convention as
+ * buildCountrySelect, plus one option per `partnerOptions` entry — a frozen,
+ * point-in-time snapshot of saved partners (`{id, name}` pairs), captured
+ * once when the row was created and never re-synced. Partner ids (numbers)
+ * become option values (as strings); partner names become option labels.
+ *
+ * @param {string} id - unique DOM id for this field within the whole page
+ * @param {{id: number, name: string}[]} partnerOptions - the frozen snapshot
+ * @param {string} value - the dropdown's current value (a partner id as a
+ *   string, or '' for the placeholder)
+ */
+export function buildPartnerSelect(id, partnerOptions, value) {
+  const select = document.createElement('select');
+  select.id = id;
+  select.name = id;
+  select.setAttribute('aria-describedby', `${id}-error`);
+
+  const placeholderOption = document.createElement('option');
+  placeholderOption.value = '';
+  placeholderOption.textContent = '— izberite —';
+  select.appendChild(placeholderOption);
+
+  for (const partner of partnerOptions) {
+    const option = document.createElement('option');
+    option.value = String(partner.id);
+    option.textContent = partner.name;
+    select.appendChild(option);
+  }
+
+  select.value = value ?? '';
+  return select;
+}
+
+/**
+ * Builds the "Partner" dropdown's { wrapper, input, error } trio, reusing
+ * the same .field/.field-error markup and aria-describedby wiring as
+ * buildFieldGroup() (plan §5.6). The fixed label is the Slovenian string
+ * "Partner" (spec §9.3) — there is no per-list variation, unlike a normal
+ * field spec's label.
+ *
+ * @param {string} id - unique DOM id for this field within the whole page
+ * @param {{id: number, name: string}[]} partnerOptions - the frozen snapshot
+ * @param {string} value - the dropdown's current value
+ */
+export function buildPartnerFieldGroup(id, partnerOptions, value) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'field';
+
+  const input = buildPartnerSelect(id, partnerOptions, value);
+  const error = buildErrorText(id);
+
+  wrapper.append(buildLabel(id, 'Partner'), input, error);
+
+  return { wrapper, input, error };
 }
 
 function buildInputForField(id, field, value) {

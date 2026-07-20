@@ -150,14 +150,22 @@ async function main() {
   await setInput('#tax-payer-id', '');
 
   // 1e. Keyboard operability — ArrowRight/ArrowLeft move tab selection
+  // (tab order: Poročilo, Partnerji, Pomoč — plan 0006 §4)
   await pressArrow('ArrowRight');
   await sleep(150);
-  check('ArrowRight moves focus to tab-pomoc', (await evalJs(`document.activeElement.id`)) === 'tab-pomoc');
-  check('ArrowRight shows the Pomoč panel', await evalJs(`!document.getElementById('panel-pomoc').hidden`));
+  check('ArrowRight moves focus to tab-partnerji', (await evalJs(`document.activeElement.id`)) === 'tab-partnerji');
+  check('ArrowRight shows the Partnerji panel', await evalJs(`!document.getElementById('panel-partnerji').hidden`));
+
+  await pressArrow('ArrowRight');
+  await sleep(150);
+  check('a second ArrowRight moves focus to tab-pomoc', (await evalJs(`document.activeElement.id`)) === 'tab-pomoc');
+  check('a second ArrowRight shows the Pomoč panel', await evalJs(`!document.getElementById('panel-pomoc').hidden`));
 
   await pressArrow('ArrowLeft');
   await sleep(150);
-  check('ArrowLeft moves focus back to tab-porocilo', (await evalJs(`document.activeElement.id`)) === 'tab-porocilo');
+  await pressArrow('ArrowLeft');
+  await sleep(150);
+  check('two ArrowLefts move focus back to tab-porocilo', (await evalJs(`document.activeElement.id`)) === 'tab-porocilo');
   check('ArrowLeft shows the Poročilo panel', await evalJs(`!document.getElementById('panel-porocilo').hidden`));
 
   // 1f. Theme toggle — default resolution, click behavior, icon/label swap

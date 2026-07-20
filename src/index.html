@@ -59,6 +59,8 @@
   <div class="tabs" role="tablist" aria-label="Zavihki">
     <button class="tab" role="tab" id="tab-porocilo"
             aria-controls="panel-porocilo" aria-selected="true" tabindex="0">Poročilo</button>
+    <button class="tab" role="tab" id="tab-partnerji"
+            aria-controls="panel-partnerji" aria-selected="false" tabindex="-1">Partnerji</button>
     <button class="tab" role="tab" id="tab-pomoc"
             aria-controls="panel-pomoc" aria-selected="false" tabindex="-1">Pomoč</button>
   </div>
@@ -68,7 +70,10 @@
       Najprej v razdelku Glava vnesite davčno številko in izberite obdobje poročanja. Nato v razdelku
       Izdani računi (KIR) z gumbom »Dodaj izdani račun« dodajte izdane račune, v razdelku Prejeti računi
       (KPR) pa z gumbom »Dodaj prejeti račun« prejete račune. Ko so podatki vneseni, jih z gumbom »Prenesi
-      JSON« izvozite v datoteko za oddajo na FURS.
+      JSON« izvozite v datoteko za oddajo na FURS. Če ste v zavihku Partnerji shranili poslovne partnerje,
+      lahko v razdelku Izdani računi (KIR) uporabite gumb »Dodaj izdani račun partnerja«, v razdelku
+      Prejeti računi (KPR) pa gumb »Dodaj prejeti račun partnerja«, in partnerja preprosto izberete iz
+      spustnega seznama, namesto da bi njegove podatke vnašali ročno.
     </p>
 
     <section id="general-section" aria-labelledby="general-heading">
@@ -91,6 +96,11 @@
       <button type="button" id="download-button" class="download-button">Prenesi JSON</button>
       <p id="download-message" class="field-error" role="alert"></p>
     </div>
+  </div>
+
+  <div id="panel-partnerji" class="tabpanel" role="tabpanel" aria-labelledby="tab-partnerji" tabindex="0" hidden>
+    <h2>Partnerji</h2>
+    <div id="partner-content"><!-- Rendered by js/view/partnerList.js --></div>
   </div>
 
   <div id="panel-pomoc" class="tabpanel" role="tabpanel" aria-labelledby="tab-pomoc" tabindex="0" hidden>
@@ -120,7 +130,25 @@
       <p>Shranjena kopija se lahko izgubi, če počistite podatke brskalnika, v zasebnem oz. anonimnem
         (incognito) načinu pa se shranjevanje morda ne bo obdržalo.</p>
     </article>
+
+    <article class="help-article">
+      <h2>Partnerji</h2>
+      <p>V zavihku Partnerji lahko shranite pogoste poslovne partnerje (kupce in dobavitelje), da vam pri
+        vnosu računov ni potrebno vsakič znova vpisovati njihovih podatkov. Za vsakega partnerja se
+        shranijo naziv, koda države in identifikacijska številka za DDV.</p>
+      <p>Novega partnerja dodate s klikom na gumb »+« v zgornjem desnem kotu seznama. Prikaže se nova
+        vrstica, v katero vnesete partnerjeve podatke. Vnos potrdite z zeleno kljukico, z rdečim »x« pa ga
+        prekličete. Vsa tri polja so obvezna; koda države in identifikacijska številka za DDV morata biti
+        veljavni.</p>
+      <p>Obstoječega partnerja uredite tako, da spremenite vrednost v njegovi vrstici in spremembo
+        potrdite z zeleno kljukico. Partnerja odstranite z rdečo ikono koša.</p>
+      <p>Podatki o partnerjih se shranijo le v vašem brskalniku in nikoli ne zapustijo vaše naprave.</p>
+      <p>Shranjene partnerje lahko nato pri vnosu izdanih (KIR) in prejetih (KPR) računov izberete iz
+        spustnega seznama, namesto da bi njihove podatke vnašali ročno.</p>
+    </article>
   </div>
+
+  <div id="message-bubble"><!-- Rendered by js/view/messageBubble.js --></div>
 </main>
 <script type="module" src="js/main.js"></script>
 </body>
