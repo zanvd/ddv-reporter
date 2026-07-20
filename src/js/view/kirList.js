@@ -3,6 +3,12 @@
 // OBRAVNAVA are auto-managed (state.js, serialize.js) and are never
 // editable fields here — see view/entryList.js for the shared rendering
 // behavior (add/edit/remove, touched/reveal-all, zapSt renumbering).
+//
+// Partner integration (plan 0006 §5.7, spec §9): a KIR row has no customer-
+// name FURS field, so only customerCountry/customerVatId (P6/P6DS) are
+// hidden behind the "Partner" dropdown on a partner-backed row — a partner's
+// name is used only as the dropdown's option label, never copied into the
+// entry.
 
 import { addKirEntry, removeKirEntry, updateKirEntry } from '../state.js';
 import { validateKirEntry } from '../validate.js';
@@ -43,8 +49,17 @@ const KIR_CONFIG = {
  *
  * @param {HTMLElement} container
  * @param {object} state - the full application state (plan §4 "state")
- * @returns {{revealErrors: () => void}}
+ * @returns {{revealErrors: () => void, refreshPartnerButton: () => void}}
  */
 export function renderKirList(container, state) {
-  return renderEntryList(container, state, KIR_CONFIG);
+  const config = {
+    ...KIR_CONFIG,
+    partner: {
+      addLabel: 'Dodaj izdani račun partnerja',
+      identityKeys: ['customerCountry', 'customerVatId'],
+      copyFrom: (partner) => ({ customerCountry: partner.countryCode, customerVatId: partner.vatId }),
+      currentPartners: () => state.partners,
+    },
+  };
+  return renderEntryList(container, state, config);
 }

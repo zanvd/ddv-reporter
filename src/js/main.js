@@ -59,11 +59,14 @@ renderPersistControls(generalPersistContainer, state);
 
 const { showMessage } = renderMessageBubble(messageBubbleContainer);
 
-// Chunk 5 wires the KIR/KPR "add … partnerja" buttons' enabled state to this
-// callback (kirView.refreshPartnerButton()/kprView.refreshPartnerButton()),
-// so adding the first partner here enables those buttons on the Poročilo
-// tab (plan §5.8). No-op until that wiring lands.
-function onPartnersChanged() {}
+// After every successful partner CRUD, re-evaluate the KIR/KPR "add …
+// partnerja" buttons' disabled state, so e.g. adding the first partner here
+// enables those buttons on the Poročilo tab as soon as the user switches
+// back (plan §5.8, spec §9.1). Small, explicit callback — no event bus.
+function onPartnersChanged() {
+  kirView.refreshPartnerButton();
+  kprView.refreshPartnerButton();
+}
 
 renderPartnerList(partnerContainer, state, { showMessage, onPartnersChanged });
 

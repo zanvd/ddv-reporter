@@ -9,6 +9,12 @@
 // no view-level special-casing needed), there are two distinct date fields
 // beyond postingDate (dateReceived P4, documentDate P5), and there's an
 // extra flatRate8/P21 amount.
+//
+// Partner integration (plan 0006 §5.7, spec §9): a KPR row's supplier name
+// IS a FURS field (P6), unlike KIR, so all three of supplierName/
+// supplierCountry/supplierVatId are hidden behind the "Partner" dropdown on
+// a partner-backed row, and a selected partner's name is copied in
+// alongside its country/VAT id.
 
 import { addKprEntry, removeKprEntry, updateKprEntry } from '../state.js';
 import { validateKprEntry } from '../validate.js';
@@ -52,8 +58,21 @@ const KPR_CONFIG = {
  *
  * @param {HTMLElement} container
  * @param {object} state - the full application state (plan §4 "state")
- * @returns {{revealErrors: () => void}}
+ * @returns {{revealErrors: () => void, refreshPartnerButton: () => void}}
  */
 export function renderKprList(container, state) {
-  return renderEntryList(container, state, KPR_CONFIG);
+  const config = {
+    ...KPR_CONFIG,
+    partner: {
+      addLabel: 'Dodaj prejeti račun partnerja',
+      identityKeys: ['supplierName', 'supplierCountry', 'supplierVatId'],
+      copyFrom: (partner) => ({
+        supplierName: partner.name,
+        supplierCountry: partner.countryCode,
+        supplierVatId: partner.vatId,
+      }),
+      currentPartners: () => state.partners,
+    },
+  };
+  return renderEntryList(container, state, config);
 }
