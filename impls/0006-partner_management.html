@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DDV Reporter — Partner Management (Partnerji) Implementation Plan</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --muted: #5a5a5a;
+    --accent: #0b5c8a;
+    --border: #d5d9dd;
+    --bg-soft: #f6f8fa;
+    --code-bg: #eef1f4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    line-height: 1.55;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 5rem;
+  }
+  h1 { font-size: 1.8rem; line-height: 1.2; margin: 0 0 0.4rem; }
+  h2 {
+    font-size: 1.25rem;
+    margin: 2.4rem 0 0.8rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 2px solid var(--border);
+  }
+  h3 { font-size: 1.05rem; margin: 1.6rem 0 0.6rem; color: var(--accent); }
+  h4 { font-size: 0.95rem; margin: 1.2rem 0 0.5rem; }
+  p, li { font-size: 0.95rem; }
+  code {
+    background: var(--code-bg);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85em;
+  }
+  pre {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.65rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--bg-soft); font-weight: 600; }
+  tr:nth-child(even) td { background: #fbfcfd; }
+  .meta {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin: 0.15rem 0;
+  }
+  .meta strong { color: var(--fg); }
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--bg-soft);
+    padding: 0.7rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.9rem;
+  }
+  ul { padding-left: 1.3rem; }
+  a { color: var(--accent); word-break: break-word; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  .tag {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.05rem 0.4rem;
+    border-radius: 3px;
+    vertical-align: middle;
+  }
+  .tag-new { background: #e5f3ea; color: #1d6b3a; }
+  .tag-chg { background: #fdf1e3; color: #955311; }
+  .tag-none { background: var(--code-bg); color: var(--muted); }
+</style>
+</head>
+<body>
+
+<h1>DDV Reporter — Partner Management (Partnerji)</h1>
+<p class="meta"><strong>Type:</strong> Technical / architecture implementation plan (the <em>how</em>).</p>
+<p class="meta"><strong>Date:</strong> 2026-07-19</p>
+<p class="meta"><strong>Source spec:</strong> <code>specs/0006-partner_management.html</code> (v1.5, Approved).</p>
+<p class="meta"><strong>Status:</strong> Approved for implementation — decisions 1–3 resolved as option A.</p>
+<p class="meta"><strong>Builds on the existing codebase:</strong> Spec/impl 0001 (KIR/KPR fields, validators, serialize),
+  0002 (<code>storage.js</code> + <code>generalStore.js</code> local persistence), 0003 (tab mechanism, per-section
+  <code>&lt;h2&gt;</code>, Pomoč articles), 0005 (last-action-wins 3&nbsp;s feedback).</p>
+
+<div class="callout">
+  <strong>Guiding principle.</strong> Partner management is a data-reuse convenience, not a tax-logic change.
+  The plan adds no new FURS field, and <strong>changes neither <code>serialize.js</code> nor the entry
+  validators' output</strong>: a selected partner only ever reaches the wire by populating the row's existing
+  identity keys (<code>customerCountry</code>/<code>customerVatId</code> for KIR;
+  <code>supplierName</code>/<code>supplierCountry</code>/<code>supplierVatId</code> for KPR). Everything stays
+  client-side; partner data is persisted with the same local-only <code>storage.js</code> envelope as Glava.
+  KISS/YAGNI throughout: no dedup, pagination, search, sort, or import/export.
+</div>
+
+<h2>1. Overview</h2>
+<p>
+  Add a saved partner address book layered over the existing KIR/KPR entry app. A new <strong>Partnerji</strong>
+  tab (second) maintains a locally-persisted partner list with inline add/edit/delete and a bottom-right
+  message bubble. On the Poročilo tab, each of the KIR and KPR lists gains a second "add" button that inserts a
+  partner-backed invoice row whose identity fields are replaced by a single partner-selection dropdown. New
+  logic lives in DOM-free modules (<code>state.js</code>, <code>validate.js</code>, a new
+  <code>partnerStore.js</code>); new UI lives under <code>view/</code>. The generic entry-list renderer is
+  extended with a config-gated partner branch; the Partnerji tab gets its own dedicated view. No change to
+  <code>serialize.js</code>, <code>derive.js</code>, <code>countries.js</code>, <code>storage.js</code>, or
+  <code>tabs.js</code>.
+</p>
+
+<h2>2. Resolved design decisions</h2>
+<table>
+  <thead><tr><th>#</th><th>Decision</th><th>Chosen (A)</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>1</td><td>Partner in-memory ownership &amp; reactivity</td>
+      <td>Partners live in <code>state.partners</code>; CRUD + id sequence in <code>state.js</code>;
+        persistence in a new <code>partnerStore.js</code> mirroring <code>generalStore.js</code>; a small
+        partners-changed callback wired in <code>main.js</code> drives the KIR/KPR add-partner buttons.</td>
+    </tr>
+    <tr>
+      <td>2</td><td>Partner-backed invoice rows</td>
+      <td>Config-gated partner branch inside the generic <code>view/entryList.js</code> (+ a dropdown builder in
+        <code>fieldBuilders.js</code>), reusing its add/edit/touch/reveal/renumber machinery. No fork.</td>
+    </tr>
+    <tr>
+      <td>3</td><td>Partnerji list view</td>
+      <td>Dedicated <code>view/partnerList.js</code> (table, per-row dirty-gated save, icon buttons,
+        write-through persistence, "+" add flow), reusing <code>touch.js</code> and the country-select /
+        error-text primitives.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>3. Domain model</h2>
+<h3>3.1 Partner value object</h3>
+<p>Internal code names (English) map to the spec's fixed Slovenian labels and, when a partner is applied to an
+  invoice, to the already-specified FURS fields (spec §7). None of the partner fields introduce a new FURS
+  code.</p>
+<table>
+  <thead>
+    <tr><th>Internal name</th><th>Label — visible (Slovenian)</th><th>Type</th><th>Validation (reused, §5)</th><th>FURS when applied</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>id</code></td><td>ID</td><td>positive integer, app-assigned</td><td>none — not user-entered, not serialized</td><td>— (app-internal)</td></tr>
+    <tr><td><code>name</code></td><td>Naziv</td><td>string</td><td><code>validateRequiredText</code> (max 250)</td><td>KPR <code>P6</code>; KIR: dropdown label only (not serialized)</td></tr>
+    <tr><td><code>countryCode</code></td><td>Koda države</td><td>ISO code (emits <code>GR</code> for Greece)</td><td><code>validateCountryCode({required:true})</code></td><td>KIR <code>P6</code> / KPR <code>P7</code></td></tr>
+    <tr><td><code>vatId</code></td><td>ID za DDV (accessible label: "Identifikacijska številka za DDV (brez kode države)")</td><td>string</td><td><code>validateVatId({required:true})</code></td><td>KIR <code>P6DS</code> / KPR <code>P7DS</code></td></tr>
+  </tbody>
+</table>
+<p class="meta">Field names are settled by the spec (fixed Slovenian labels) — no placeholder labels remain to
+  confirm. The "ID za DDV" column header is the only abbreviated one; its full string stays available as the
+  input's <code>aria-label</code> (§5.1, §7).</p>
+
+<h3>3.2 State shape</h3>
+<p><code>createState()</code> gains two fields alongside the existing <code>general</code>/<code>kir</code>/<code>kpr</code>:</p>
+<pre>{
+  general: { ... },        // unchanged
+  kir: [ ... ],            // unchanged
+  kpr: [ ... ],            // unchanged
+  partners: [],            // NEW — [{ id:number, name, countryCode, vatId }], ordered by id asc
+  nextPartnerId: 1,        // NEW — session id sequence (see §3.3)
+}</pre>
+<div class="callout">
+  <strong>Serialize/validate isolation.</strong> <code>serialize.js</code> and <code>validate.js</code> read
+  only <code>general</code>/<code>kir</code>/<code>kpr</code>; <code>state.partners</code> and
+  <code>state.nextPartnerId</code> are invisible to the DDV_KIR_KPR output and the Download gate. Partner-backed
+  rows carry <strong>no extra keys</strong> in the <code>kir</code>/<code>kpr</code> entry objects — the frozen
+  dropdown snapshot and "partner-backed" flag live in the view-layer row closure (§6.3), so the serialized
+  output is byte-for-byte unchanged from a manually-typed row with the same identity values.
+</div>
+
+<h3>3.3 Id assignment (spec §5.6)</h3>
+<ul>
+  <li>Positive integers starting at 1, never user-entered.</li>
+  <li><code>nextPartnerId</code> is a <strong>session sequence seeded at load</strong> to
+    <code>max(stored ids) + 1</code> (or 1 if none). Each <code>addPartner</code> assigns the current value and
+    increments it. This reproduces the spec's semantics exactly: <strong>no in-session id reuse</strong> (the
+    sequence only climbs within a session), and reuse is possible only after a reload re-seeds the sequence from
+    a now-lower stored max (e.g. after deleting the highest-id partner). Acceptable per §5.6 (ids are internal).</li>
+</ul>
+
+<h2>4. Technology</h2>
+<p>No change to the stack: vanilla HTML + CSS + ES-module JS, no build step, no framework, no runtime
+  dependencies (CLAUDE.md). Persistence reuses the existing <code>localStorage</code> envelope in
+  <code>storage.js</code>. Tests use Node's built-in runner for the pure logic modules; DOM-heavy view paths are
+  exercised with the CDP smoke skill (<code>.claude/skills/run/</code>). No new tooling or libraries — every new
+  concern is covered by existing primitives (<code>touch.js</code>, <code>fieldBuilders.js</code> builders,
+  <code>storage.js</code>, the 3000&nbsp;ms feedback pattern from <code>persistControls.js</code>).</p>
+
+<h2>5. Architecture — modules</h2>
+<p>Legend: <span class="tag tag-new">new</span> <span class="tag tag-chg">changed</span>
+  <span class="tag tag-none">unchanged</span></p>
+
+<h3>5.1 <code>js/partnerStore.js</code> <span class="tag tag-new">new</span></h3>
+<p>Partner-specific persistence glue, mirroring <code>generalStore.js</code>, on top of the generic
+  <code>storage.js</code>. DOM-free.</p>
+<ul>
+  <li>Domain key <code>'partners'</code> → <code>localStorage</code> key <code>ddvReporter.partners</code>;
+    envelope <code>{ version: 1, data: { partners: [...] } }</code>.</li>
+  <li><code>loadPartners()</code> → sanitized array (each item reduced to the four recognized fields, unknown
+    fields ignored — same defensive picking as <code>generalStore.pickFields</code>), or <code>[]</code> if
+    nothing stored / record corrupt.</li>
+  <li><code>savePartners(partners)</code> → <code>boolean</code>. Whole-list write-through: the entire array is
+    re-persisted on every create/update/delete (simplest correct model; the list is small and never paginated).
+    Returns <code>storage.writeRecord</code>'s boolean so callers can drive the success/error bubble.</li>
+  <li>No validation gate here (validation happens in the view before calling save, §7).</li>
+</ul>
+
+<h3>5.2 <code>js/state.js</code> <span class="tag tag-chg">changed</span></h3>
+<ul>
+  <li><code>createState()</code> adds <code>partners: []</code> and <code>nextPartnerId: 1</code>.</li>
+  <li><code>addPartner(state, { name, countryCode, vatId })</code> → assigns <code>id = state.nextPartnerId++</code>,
+    pushes <code>{ id, name, countryCode, vatId }</code>, returns the new id. (Partners are ordered by id
+    ascending by construction; no renumbering, unlike KIR/KPR <code>zapSt</code>.)</li>
+  <li><code>updatePartner(state, id, patch)</code> → merges editable fields into the matching partner.</li>
+  <li><code>removePartner(state, id)</code> → splices the partner out. <code>nextPartnerId</code> is
+    <strong>not</strong> decremented (§3.3).</li>
+  <li><code>seedPartners(state, partners)</code> (or equivalent in <code>main.js</code> bootstrap) — replaces
+    <code>state.partners</code> with the loaded array and sets <code>state.nextPartnerId = max(ids)+1 || 1</code>.</li>
+</ul>
+
+<h3>5.3 <code>js/validate.js</code> <span class="tag tag-chg">changed</span></h3>
+<ul>
+  <li>Add <code>validatePartner(partner)</code> → field-error map keyed <code>name</code>/<code>countryCode</code>/<code>vatId</code>,
+    reusing the existing <code>validateRequiredText</code>, <code>validateCountryCode({required:true})</code>,
+    and <code>validateVatId({required:true})</code>. All three required for both add and edit (§8).</li>
+  <li>Add a tiny <code>hasPartnerErrors(errorMap)</code> helper (or reuse
+    <code>Object.keys(...).length &gt; 0</code> at call sites).</li>
+  <li><strong>No change to <code>validateKirEntry</code>/<code>validateKprEntry</code> signatures or output</strong>
+    (spec §12.2). The "Partner ne obstaja." indicator is deliberately <em>not</em> a <code>validate.js</code>
+    error — it is a live UI-level check in the view (§6.4).</li>
+</ul>
+
+<h3>5.4 <code>js/view/partnerList.js</code> <span class="tag tag-new">new</span></h3>
+<p>The Partnerji tab view. Renders into <code>#partner-content</code>, bound to <code>state.partners</code>.</p>
+<ul>
+  <li><strong>Layout (§5.1):</strong> a table with header row <code>ID</code> / <code>Naziv</code> /
+    <code>Koda države</code> / <code>ID za DDV</code> + two headerless columns (save, delete). A top-right
+    <code>+</code> icon button, <code>aria-label="Dodaj partnerja"</code>.</li>
+  <li><strong>Empty state (§5.2):</strong> "Brez shranjenih partnerjev." shown when
+    <code>state.partners.length === 0</code>; the <code>+</code> button stays present and usable.</li>
+  <li><strong>Per-row fields (§5.3):</strong> Naziv (text, maxlength 250), Koda države (the shared country select
+    — reuse <code>buildCountrySelect</code> from <code>fieldBuilders.js</code>), ID za DDV (text, maxlength 25,
+    with the full accessible <code>aria-label</code>). ID column read-only. Each editable field carries a
+    <code>.field-error</code> element for inline errors.</li>
+  <li><strong>Quiet-until-touched (§8):</strong> reuse <code>view/touch.js</code> per row; a field's error stays
+    hidden until touched; the row's save-button click reveals all of that row's errors at once (the row-level
+    analogue of the Download gate).</li>
+  <li><strong>Saved-row buttons (§5.4):</strong> green checkmark <em>save</em>
+    (<code>aria-label="Posodobi partnerja"</code>), <strong>disabled unless the row has an unsaved edit</strong>
+    (at least one editable field differs from the persisted value — dirty-tracking against a per-row snapshot of
+    the last-saved values); red bin <em>delete</em> (<code>aria-label="Odstrani partnerja"</code>), always
+    enabled, no confirm dialog.</li>
+  <li><strong>Add flow (§5.5):</strong> <code>+</code> scrolls the list into view and appends one blank row (ID
+    blank) with a green checkmark save (<code>aria-label="Shrani partnerja"</code>) and a red "x" cancel
+    (<code>aria-label="Prekliči dodajanje partnerja"</code>). The new row's save is <strong>enabled
+    immediately</strong> (spec §12.1 confirmed) — clicking it blank reveals required-field errors. Cancel just
+    removes the row (no storage, no message). <strong>Only one unsaved new row at a time</strong>: a second
+    <code>+</code> click scrolls to the existing unsaved row instead of adding another.</li>
+  <li><strong>On successful save of a new row:</strong> assign id, show it in the ID column, and morph the two
+    buttons to the saved-row pair (checkmark → disabled "Posodobi partnerja"; "x" → "Odstrani partnerja"),
+    switching their <code>aria-label</code>s accordingly.</li>
+  <li><strong>Persistence + feedback:</strong> each CRUD calls the <code>state.js</code> mutator then
+    <code>partnerStore.savePartners(state.partners)</code>. Write-through and rollback: apply the mutation to
+    <code>state.partners</code>, attempt save; on <code>false</code> <strong>revert the mutation</strong> and
+    show the action-specific error bubble; on <code>true</code> keep it and show the success bubble (§6, §11).
+    After any successful CRUD, fire the injected <code>onPartnersChanged</code> callback (§5.7).</li>
+  <li><strong>Validation gate:</strong> a row with any <code>validatePartner</code> error cannot be saved —
+    errors are revealed inline, nothing is persisted, no bubble (a validation failure never reaches storage,
+    distinct from a persistence failure, §6/§8).</li>
+</ul>
+<p class="meta">Messages produced by this view (all fixed Slovenian, §6): success "Partner dodan" /
+  "Partner posodobljen" / "Partner odstranjen"; persistence-failure "Pri dodajanju partnerja je prišlo do
+  napake." / "Pri posodabljanju partnerja je prišlo do napake." / "Pri odstranjevanju partnerja je prišlo do
+  napake."</p>
+
+<h3>5.5 <code>js/view/messageBubble.js</code> <span class="tag tag-new">new</span></h3>
+<ul>
+  <li>Single shared bottom-right bubble, mounted to a container in <code>index.html</code>. Exposes
+    <code>showMessage(text, { success })</code>.</li>
+  <li>Last-action-wins single slot: a new message immediately replaces the visible one and restarts the timer;
+    auto-dismiss after <strong>3000&nbsp;ms</strong> (reuse the existing duration). <code>success</code>/<code>error</code>
+    class drives the background color.</li>
+  <li>Announced to assistive tech via a <code>role="status"</code> live region (consistent with
+    <code>persistControls</code> feedback). Structurally close to <code>createFeedbackSlot()</code> in
+    <code>persistControls.js</code>, but positioned as a global fixed bubble rather than an inline slot.</li>
+</ul>
+
+<h3>5.6 <code>js/view/entryList.js</code> + <code>js/view/fieldBuilders.js</code> <span class="tag tag-chg">changed</span></h3>
+<p>Partner-backed rows are added as a <strong>config-gated branch</strong> — inert unless
+  <code>config.partner</code> is present (so Glava-less behavior for lists without partners is impossible;
+  KIR/KPR both supply it).</p>
+<h4><code>config.partner</code> descriptor (supplied by <code>kirList.js</code>/<code>kprList.js</code>)</h4>
+<pre>partner: {
+  addLabel: 'Dodaj izdani račun partnerja',        // or 'Dodaj prejeti račun partnerja'
+  identityKeys: ['customerCountry', 'customerVatId'],   // KPR: ['supplierName','supplierCountry','supplierVatId']
+  copyFrom: (p) => ({ customerCountry: p.countryCode, customerVatId: p.vatId }),
+                                                   // KPR also copies supplierName: p.name
+  currentPartners: () => state.partners,           // live set, for snapshot + stale check
+}</pre>
+<h4>Second add button (§9.1)</h4>
+<ul>
+  <li>When <code>config.partner</code> exists, render a second button labeled <code>config.partner.addLabel</code>
+    to the right of the existing add button. <strong>Disabled when <code>currentPartners().length === 0</code></strong>.
+    Its enabled state is refreshed by <code>onPartnersChanged</code> (§5.7).</li>
+  <li>Click: <code>id = config.addEntry(state, emptyFields)</code>, then
+    <code>addRow(id, { partnerBacked: true, partnerOptions: snapshot() })</code> where
+    <code>snapshot()</code> = <code>currentPartners().map(p =&gt; ({ id: p.id, name: p.name }))</code> — the
+    frozen point-in-time option list (§9.3).</li>
+</ul>
+<h4>Partner-backed row rendering (§9.2–9.4)</h4>
+<ul>
+  <li><code>buildEntryRow</code> takes a <code>{ partnerBacked, partnerOptions }</code> option. When
+    <code>partnerBacked</code>: the identity-key field groups are <strong>not rendered</strong>; instead a single
+    "Partner" dropdown group is rendered in their place (label "Partner", placeholder "— izberite —", options =
+    <code>partnerOptions</code> with <code>value=id</code>, <code>textContent=name</code>). All non-identity
+    fields render exactly as normal.</li>
+  <li>New builder in <code>fieldBuilders.js</code>: <code>buildPartnerSelect(id, partnerOptions, value)</code>
+    (a select with the shared placeholder + one option per snapshot entry) + its <code>{wrapper,input,error}</code>
+    trio via a small wrapper, so the existing <code>.field</code>/<code>.field-error</code> markup and
+    <code>aria-describedby</code> wiring are reused.</li>
+  <li><strong>On select</strong> (change): look up the chosen id in <code>currentPartners()</code> (live):
+    <ul>
+      <li><em>Exists</em> → clear any stale flag; <code>config.updateEntry(state, entry.id, config.partner.copyFrom(partner))</code>
+        copies the partner's <strong>current</strong> data into the row's identity keys. From here the row owns
+        an independent copy (§9.4).</li>
+      <li><em>Stale / removed</em> (in the frozen snapshot but no longer in the live set) → set a persistent
+        row-local <code>staleSelected = true</code>; <strong>clear</strong> the row's identity keys —
+        <code>config.updateEntry(state, entry.id, Object.fromEntries(config.partner.identityKeys.map(k =&gt; [k, ''])))</code>
+        — discarding whatever they previously held, rather than leaving them populated (§9.3, §9.4).</li>
+      <li>Placeholder re-selected (empty) → clear the stale flag and clear the identity keys the same way (§9.3).</li>
+    </ul>
+    Mark the dropdown "touched", then <code>refreshErrors()</code>.</li>
+  <li><strong>Row message (single, at the dropdown, §9.3/§9.4):</strong> <code>refreshErrors()</code> for a
+    partner-backed row computes <code>config.validateEntry(entry)</code> as usual but, instead of writing the
+    identity keys' own error text (those inputs aren't rendered), resolves one dropdown message with this
+    precedence:
+    <ol>
+      <li>if <code>staleSelected</code> → "Partner ne obstaja." (persistent; independent of the Download gate;
+        cleared only by selecting a currently-existing partner);</li>
+      <li>else if the dropdown is touched/revealed <em>and</em> any <code>identityKeys</code> field has an error
+        → "Izberite partnerja.";</li>
+      <li>else → empty.</li>
+    </ol>
+    Non-identity fields keep their own normal per-field error text.</li>
+  <li><strong>Download gate is unchanged.</strong> Because the identity keys live in <code>state</code>,
+    <code>validateState</code>/<code>hasAnyErrors</code> already catch a partner-backed KPR row whose supplier
+    fields are blank (blocks) and already pass a partner-backed KIR row left blank (valid both-blank optional
+    pair). No partner-specific carve-out; <code>main.js</code>'s gate logic is untouched. <code>revealErrors()</code>
+    marks the dropdown touched so the "Izberite partnerja." message surfaces on a blocked KPR row.</li>
+  <li><strong>Stale check is selection-time only</strong> (§9.4): later deletion/edit of a partner does not
+    re-run the check on an untouched row, so an already-copied row downloads fine with no indicator. No reactive
+    subscription is needed for the indicator.</li>
+</ul>
+
+<h3>5.7 <code>js/view/kirList.js</code> / <code>kprList.js</code> <span class="tag tag-chg">changed</span></h3>
+<ul>
+  <li>Each adds a <code>partner</code> descriptor to its config (§5.6) and returns, alongside
+    <code>revealErrors</code>, a <code>refreshPartnerButton()</code> that re-evaluates the add-partner button's
+    disabled state from <code>currentPartners().length</code>.</li>
+</ul>
+
+<h3>5.8 <code>js/main.js</code> <span class="tag tag-chg">changed</span></h3>
+<ul>
+  <li>At boot: <code>const stored = loadPartners();</code> then seed <code>state.partners</code> and
+    <code>state.nextPartnerId</code> (§5.2). (KIR/KPR remain session-only, unchanged.)</li>
+  <li>Mount the bubble (<code>messageBubble</code>) and the Partnerji view
+    (<code>renderPartnerList(document.getElementById('partner-content'), state, { showMessage, onPartnersChanged })</code>).</li>
+  <li>Wire reactivity: <code>onPartnersChanged</code> calls <code>kirView.refreshPartnerButton()</code> and
+    <code>kprView.refreshPartnerButton()</code>, so adding the first partner on the Partnerji tab enables the
+    Poročilo add-partner buttons when the user switches back (spec §9.1). Small, explicit callback — no event
+    bus.</li>
+  <li>Download gate, derive, serialize, filename: <strong>unchanged</strong>.</li>
+</ul>
+
+<h3>5.9 <code>index.html</code> <span class="tag tag-chg">changed</span></h3>
+<ul>
+  <li>Tab bar gains a third tab between Poročilo and Pomoč:
+    <code>&lt;button class="tab" role="tab" id="tab-partnerji" aria-controls="panel-partnerji" aria-selected="false" tabindex="-1"&gt;Partnerji&lt;/button&gt;</code>.
+    Order becomes Poročilo / Partnerji / Pomoč. Default selected tab stays Poročilo.</li>
+  <li>New panel <code>#panel-partnerji</code> (<code>role="tabpanel"</code>, <code>hidden</code>) containing
+    <code>&lt;h2&gt;Partnerji&lt;/h2&gt;</code> + <code>&lt;div id="partner-content"&gt;&lt;/div&gt;</code>.</li>
+  <li>Append the fixed §10.2 blurb to the existing <code>.app-intro</code> paragraph.</li>
+  <li>Add the fixed §10.1 "Partnerji" help article to the Pomoč panel (a <code>&lt;h2&gt;Partnerji&lt;/h2&gt;</code>
+    article, matching the "Pomnenje" article structure).</li>
+  <li>Add the bubble container, e.g. <code>&lt;div id="message-bubble"&gt;&lt;/div&gt;</code> under
+    <code>&lt;main&gt;</code>.</li>
+  <li><code>tabs.js</code> needs <strong>no change</strong> — it enumerates all <code>[role="tab"]</code> and
+    arrow-navigates in DOM order; the mid-inserted tab keeps correct order and preserves the state-preserving
+    show/hide guarantee (§4).</li>
+</ul>
+
+<h3>5.10 <code>css/styles.css</code> <span class="tag tag-chg">changed</span></h3>
+<ul>
+  <li>Partner table layout; the two icon-button columns; the row-scoped save (checkmark), delete (bin), and
+    cancel ("x") icon buttons; disabled styling for a dirty-gated save.</li>
+  <li>The <code>+</code> add-partner button (top-right of the list).</li>
+  <li>Disabled styling for the KIR/KPR add-partner-invoice buttons when no partners exist.</li>
+  <li>The bottom-right bubble: fixed position, success/error variants, <strong>dark-mode aware</strong> (reuse
+    the existing theme tokens / <code>[data-theme]</code> variables).</li>
+</ul>
+
+<h3>5.11 Unchanged modules <span class="tag tag-none">unchanged</span></h3>
+<p><code>serialize.js</code>, <code>derive.js</code>, <code>countries.js</code>, <code>storage.js</code>,
+  <code>download.js</code>, <code>generalStore.js</code>, <code>view/general.js</code>,
+  <code>view/persistControls.js</code>, <code>view/tabs.js</code>, <code>view/themeToggle.js</code>,
+  <code>themeStore.js</code>, <code>view/touch.js</code> — no changes.</p>
+
+<h2>6. Data flow</h2>
+<pre>PARTNERJI TAB (view/partnerList.js)
+  +  add row → (blank)                    save → validatePartner → addPartner(state)
+  edit field → dirty-track → enable save  save → validatePartner → updatePartner(state)
+  delete → removePartner(state)
+        │                                        │
+        │  each CRUD: mutate state.partners → partnerStore.savePartners(state.partners)
+        │     success → success bubble + onPartnersChanged()
+        │     failure → revert mutation + error bubble
+        ▼
+  onPartnersChanged() ─────────► kirView.refreshPartnerButton()
+                                 kprView.refreshPartnerButton()   (enable iff partners exist)
+
+POROČILO TAB (view/entryList.js, partner branch)
+  "Dodaj … partnerja" (enabled iff partners) → new row + frozen {id,name} snapshot + "Partner" dropdown
+  select partner (exists) → copy countryCode/vatId(/name) → row identity keys in state
+  select stale option / placeholder → clear row identity keys; stale option also shows
+                                       "Partner ne obstaja." (persistent)
+  Download ─► validateState(state)  [UNCHANGED]  ─► serialize(state)  [UNCHANGED]  ─► download.js</pre>
+
+<h2>7. Key implementation concerns</h2>
+<ul>
+  <li><strong>Output correctness.</strong> The single most important invariant: a partner-backed row must
+    serialize identically to a typed row with the same identity values. Guaranteed by copying into the existing
+    identity keys and touching neither <code>serialize.js</code> nor the entry validators. Covered by an
+    integration test asserting equal JSON for a typed vs. partner-backed row of the same data.</li>
+  <li><strong>Validation vs. persistence failure (§6, §8, §11).</strong> Two distinct failure paths: a
+    <em>validation</em> failure reveals inline errors and never reaches storage / never shows a bubble; a
+    <em>persistence</em> failure (storage blocked) shows the action-specific error bubble, and the in-memory
+    mutation is reverted so the list reflects reality.</li>
+  <li><strong>Message precedence (§9.4).</strong> "Partner ne obstaja." (live, persistent, download-independent)
+    outranks "Izberite partnerja." (download-gate driven). Hidden identity fields' own error text is never
+    surfaced on a partner-backed row.</li>
+  <li><strong>Frozen snapshot (§9.3).</strong> The dropdown option list is captured once at row creation and
+    never re-synced; a new partner-backed row created later gets a fresh snapshot. Kept in the row closure, not
+    in state.</li>
+  <li><strong>Edge cases (§11).</strong> No partners → empty state + disabled add-partner buttons; cancel unsaved
+    row → silent removal; second <code>+</code> with an unsaved row → scroll only; blank-required save → reveal,
+    no persist; storage failure → error bubble + revert; duplicate name/VAT id → allowed (distinct ids);
+    revert-to-saved edit → save disabled again; partner deleted after a row copied it → row downloads fine, no
+    indicator; new partner-backed row after a deletion → fresh (post-deletion) snapshot; selecting a stale
+    option or re-selecting the placeholder → row's identity keys cleared to empty, discarding any previously
+    copied data (§9.3, §9.4).</li>
+  <li><strong>Testing.</strong>
+    <ul>
+      <li><em>Unit (Node runner):</em> <code>partnerStore.test.js</code> (load/save/round-trip, corrupt record,
+        write failure via injected backend); <code>state.test.js</code> additions (add/update/remove, id
+        sequencing incl. no in-session reuse + reload reuse, seeding from stored max);
+        <code>validate.test.js</code> additions (<code>validatePartner</code> for each field, required in both
+        flows).</li>
+      <li><em>Integration:</em> typed-vs-partner-backed row serialize equality; partner-backed KPR blank blocks
+        download while KIR blank does not.</li>
+      <li><em>Smoke (CDP):</em> add/edit/delete + bubbles; dirty-gated save; single-unsaved-row rule; add-partner
+        buttons enable after first partner across a tab switch; stale-option "Partner ne obstaja." persistence
+        and identity-key clearing; placeholder re-selection clearing a previously-populated row; "Izberite
+        partnerja." on a blocked KPR row; tab-switch state preservation; dark-mode bubble.</li>
+    </ul>
+  </li>
+</ul>
+
+<h2>8. File / work sequencing</h2>
+<table>
+  <thead><tr><th>Chunk</th><th>Scope</th><th>Files</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Partner persistence + state CRUD + id sequence</td><td><code>partnerStore.js</code> (+test), <code>state.js</code> (+test)</td></tr>
+    <tr><td>2</td><td>Partner validation</td><td><code>validate.js</code> (+test)</td></tr>
+    <tr><td>3</td><td>Message bubble component + container + CSS</td><td><code>view/messageBubble.js</code>, <code>index.html</code>, <code>css/styles.css</code></td></tr>
+    <tr><td>4</td><td>Partnerji tab + panel + view (list, add/edit/delete, bubbles, persistence, dirty-gated save)</td><td><code>index.html</code>, <code>view/partnerList.js</code>, <code>css/styles.css</code>, <code>main.js</code> wiring</td></tr>
+    <tr><td>5</td><td>KIR/KPR partner branch: second add button, partner dropdown, copy-on-select, dropdown messages</td><td><code>view/entryList.js</code>, <code>view/fieldBuilders.js</code> (+test), <code>view/kirList.js</code>, <code>view/kprList.js</code>, <code>main.js</code> reactivity, integration test</td></tr>
+    <tr><td>6</td><td>Help content: Pomoč "Partnerji" article + Poročilo intro blurb</td><td><code>index.html</code></td></tr>
+  </tbody>
+</table>
+<p class="meta">Each chunk stops for user review before the next, per the mandatory chunk-approval gate (CLAUDE.md).</p>
+
+<h2>9. Assumptions &amp; out of scope</h2>
+<ul>
+  <li><strong>Out of scope (spec §3):</strong> pagination, filtering, sorting, search; any change to DDV_KIR_KPR
+    output/FURS fields/serialization/entry-validation rules; dedup/uniqueness enforcement; import/export, sync,
+    or any server interaction.</li>
+  <li><strong>Assumptions:</strong> the whole-partner-list write-through model is adequate (small list, no
+    partial-write concerns); id reuse only after reload is acceptable (§3.3); the frozen dropdown snapshot and
+    partner-backed flag live in the view row closure (no new state entry keys); <code>tabs.js</code> and the
+    Download gate need no modification. All new user-facing text is the fixed Slovenian strings from the spec;
+    code identifiers and internal errors stay English; FURS wire identifiers are untouched.</li>
+</ul>
+
+</body>
+</html>
