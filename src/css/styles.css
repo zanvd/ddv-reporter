@@ -401,3 +401,28 @@ button {
 #download-message {
   margin-top: 0.5rem;
 }
+
+.message-bubble {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  max-width: 20rem;
+  padding: 0.65rem 1rem;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  font-size: 0.9rem;
+  color: var(--on-accent);
+  z-index: 100;
+}
+
+.message-bubble[hidden] {
+  display: none;
+}
+
+.message-bubble-success {
+  background: var(--success);
+}
+
+.message-bubble-error {
+  background: var(--error);
+}
