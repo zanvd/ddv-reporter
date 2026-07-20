@@ -6,12 +6,15 @@
 import { derivePeriod } from './derive.js';
 import { buildDownloadFilename, downloadJson } from './download.js';
 import { loadGeneral } from './generalStore.js';
+import { loadPartners } from './partnerStore.js';
 import { serialize } from './serialize.js';
-import { createState, updateGeneral } from './state.js';
+import { createState, seedPartners, updateGeneral } from './state.js';
 import { hasAnyErrors, validateState } from './validate.js';
 import { renderGeneral } from './view/general.js';
 import { renderKirList } from './view/kirList.js';
 import { renderKprList } from './view/kprList.js';
+import { renderMessageBubble } from './view/messageBubble.js';
+import { renderPartnerList } from './view/partnerList.js';
 import { renderPersistControls } from './view/persistControls.js';
 import { initTabs } from './view/tabs.js';
 import { initThemeToggle } from './view/themeToggle.js';
@@ -24,6 +27,10 @@ const state = createState();
 const restoredGeneral = loadGeneral();
 if (restoredGeneral) updateGeneral(state, restoredGeneral);
 
+// Partners, unlike Glava, are always restored (plan 0006 §5.2) — the
+// Partnerji tab is itself a persisted list, not an opt-in "remembered" copy.
+seedPartners(state, loadPartners());
+
 // Each view mounts into an inner content <div>, not the whole <section>,
 // so its container.replaceChildren() never wipes out the section's static
 // <h2> heading.
@@ -31,10 +38,12 @@ const generalContainer = document.getElementById('general-content');
 const kirContainer = document.getElementById('kir-content');
 const kprContainer = document.getElementById('kpr-content');
 const generalPersistContainer = document.getElementById('general-persist');
+const partnerContainer = document.getElementById('partner-content');
+const messageBubbleContainer = document.getElementById('message-bubble');
 
-// The Download gate calls revealErrors() on all three views so clicking
-// Download surfaces every remaining error at once, even for fields the
-// user never touched.
+// The Download gate calls revealErrors() on all three report-form views so
+// clicking Download surfaces every remaining error at once, even for fields
+// the user never touched.
 const generalView = renderGeneral(generalContainer, state);
 const kirView = renderKirList(kirContainer, state);
 const kprView = renderKprList(kprContainer, state);
@@ -47,6 +56,16 @@ const kprView = renderKprList(kprContainer, state);
 if (restoredGeneral) generalView.revealErrors();
 
 renderPersistControls(generalPersistContainer, state);
+
+const { showMessage } = renderMessageBubble(messageBubbleContainer);
+
+// Chunk 5 wires the KIR/KPR "add … partnerja" buttons' enabled state to this
+// callback (kirView.refreshPartnerButton()/kprView.refreshPartnerButton()),
+// so adding the first partner here enables those buttons on the Poročilo
+// tab (plan §5.8). No-op until that wiring lands.
+function onPartnersChanged() {}
+
+renderPartnerList(partnerContainer, state, { showMessage, onPartnersChanged });
 
 initTabs(document.querySelector('[role="tablist"]'));
 initThemeToggle(document.getElementById('theme-toggle'));

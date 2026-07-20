@@ -426,3 +426,98 @@ button {
 .message-bubble-error {
   background: var(--error);
 }
+
+.partner-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
+}
+
+.partner-add-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.partner-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0.75rem;
+}
+
+.partner-table th,
+.partner-table td {
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+
+.partner-table th {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.partner-table td input,
+.partner-table td select {
+  width: 100%;
+  font: inherit;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.partner-id-cell {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.partner-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.partner-icon-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.partner-icon-button-icon::before {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.partner-save-button .partner-icon-button-icon::before {
+  content: "\2713";
+  color: var(--success);
+}
+
+.partner-save-button:disabled .partner-icon-button-icon::before {
+  color: var(--muted);
+}
+
+.partner-delete-button .partner-icon-button-icon::before {
+  content: "\1F5D1";
+  color: var(--error);
+}
+
+.partner-cancel-button .partner-icon-button-icon::before {
+  content: "\2715";
+  color: var(--error);
+}

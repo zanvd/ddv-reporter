@@ -26,7 +26,13 @@ function buildLabel(id, labelText) {
   return label;
 }
 
-function buildErrorText(id) {
+/**
+ * Builds a field's inline error paragraph: `role="alert"`, id `{id}-error`
+ * (the target of the field's `aria-describedby`). Shared by every view that
+ * needs a standalone error slot outside a full buildFieldGroup() trio (e.g.
+ * view/partnerList.js's table cells).
+ */
+export function buildErrorText(id) {
   const error = document.createElement('p');
   error.className = 'field-error';
   error.id = `${id}-error`;
@@ -62,7 +68,13 @@ function buildDateInput(id, value) {
   return input;
 }
 
-function buildCountrySelect(id, value) {
+/**
+ * Builds the shared country `<select>` (the same control/option set as the
+ * KIR/KPR country fields): a "— izberite —" placeholder plus one option per
+ * COUNTRIES entry, emitting ISO codes as values. Reused as-is by
+ * view/partnerList.js for the "Koda države" column (plan 0006 §5.4).
+ */
+export function buildCountrySelect(id, value) {
   const select = document.createElement('select');
   select.id = id;
   select.name = id;

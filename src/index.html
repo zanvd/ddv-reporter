@@ -59,6 +59,8 @@
   <div class="tabs" role="tablist" aria-label="Zavihki">
     <button class="tab" role="tab" id="tab-porocilo"
             aria-controls="panel-porocilo" aria-selected="true" tabindex="0">Poročilo</button>
+    <button class="tab" role="tab" id="tab-partnerji"
+            aria-controls="panel-partnerji" aria-selected="false" tabindex="-1">Partnerji</button>
     <button class="tab" role="tab" id="tab-pomoc"
             aria-controls="panel-pomoc" aria-selected="false" tabindex="-1">Pomoč</button>
   </div>
@@ -91,6 +93,11 @@
       <button type="button" id="download-button" class="download-button">Prenesi JSON</button>
       <p id="download-message" class="field-error" role="alert"></p>
     </div>
+  </div>
+
+  <div id="panel-partnerji" class="tabpanel" role="tabpanel" aria-labelledby="tab-partnerji" tabindex="0" hidden>
+    <h2>Partnerji</h2>
+    <div id="partner-content"><!-- Rendered by js/view/partnerList.js --></div>
   </div>
 
   <div id="panel-pomoc" class="tabpanel" role="tabpanel" aria-labelledby="tab-pomoc" tabindex="0" hidden>
