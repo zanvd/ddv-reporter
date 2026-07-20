@@ -1,5 +1,6 @@
-// In-memory application state: general + kir[] + kpr[], with add/update/remove
-// operations for both entry lists (plan §4 "state" module responsibility).
+// In-memory application state: general + kir[] + kpr[] + partners[], with
+// add/update/remove operations for both entry lists and the partner list
+// (plan §4 "state" module responsibility; plan 0006 §3.2/§5.2 for partners).
 //
 // No DOM access. Feeds derive.js/validate.js/serialize.js but does not depend
 // on them.
@@ -15,6 +16,12 @@
 //     consecutive). This is for live UI display; serialize.js independently
 //     (re-)computes ZAPST from array position at serialize time, so the two
 //     always agree.
+//
+// Partners (plan 0006 §3) are a separate, simpler list: no zapSt (they are
+// not report entries, never serialized), ordered by id ascending by
+// construction (ids only ever climb — see nextEntryId vs. nextPartnerId
+// below), and out of reach of serialize.js/validate.js entirely (plan 0006
+// §3.2 "Serialize/validate isolation").
 
 let idCounter = 0;
 
@@ -36,6 +43,8 @@ export function createState() {
     },
     kir: [],
     kpr: [],
+    partners: [],
+    nextPartnerId: 1,
   };
 }
 
@@ -102,4 +111,51 @@ export function updateKprEntry(state, id, patch) {
 /** Removes the KPR entry with the given id and renumbers the remaining ones. */
 export function removeKprEntry(state, id) {
   removeEntry(state.kpr, id);
+}
+
+// --- Partners (plan 0006 §3, §5.2) ------------------------------------------
+//
+// Unlike KIR/KPR entries, a partner's id is the app-assigned positive
+// integer that is its identity (plan §3.3) — not an opaque session id — so
+// it is meaningful to persist and to seed from storage on load.
+
+/**
+ * Appends a new partner, assigning it `state.nextPartnerId` (then
+ * incrementing that sequence), and returns the assigned id (plan §3.3: a
+ * session sequence that only ever climbs — no in-session id reuse).
+ */
+export function addPartner(state, { name, countryCode, vatId }) {
+  const id = state.nextPartnerId++;
+  state.partners.push({ id, name, countryCode, vatId });
+  return id;
+}
+
+/** Merges the given field values into the partner matching id. */
+export function updatePartner(state, id, patch) {
+  const partner = state.partners.find((candidate) => candidate.id === id);
+  if (!partner) {
+    throw new Error(`No partner with id: ${id}`);
+  }
+  Object.assign(partner, patch);
+}
+
+/** Removes the partner with the given id. `nextPartnerId` is not decremented (plan §3.3). */
+export function removePartner(state, id) {
+  const index = state.partners.findIndex((candidate) => candidate.id === id);
+  if (index === -1) {
+    throw new Error(`No partner with id: ${id}`);
+  }
+  state.partners.splice(index, 1);
+}
+
+/**
+ * Replaces `state.partners` with a loaded array (e.g. from partnerStore.js)
+ * and re-seeds `nextPartnerId` to one past the highest loaded id (or 1 if
+ * `partners` is empty), so ids assigned this session never collide with a
+ * previously stored one (plan §3.3, §5.2).
+ */
+export function seedPartners(state, partners) {
+  state.partners = partners;
+  const maxId = partners.reduce((max, partner) => Math.max(max, partner.id), 0);
+  state.nextPartnerId = maxId + 1;
 }

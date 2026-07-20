@@ -4,18 +4,24 @@ import { test } from 'node:test';
 import {
   addKirEntry,
   addKprEntry,
+  addPartner,
   createState,
   removeKirEntry,
   removeKprEntry,
+  removePartner,
+  seedPartners,
   updateGeneral,
   updateKirEntry,
   updateKprEntry,
+  updatePartner,
 } from './state.js';
 
 test('createState returns empty lists and general-section defaults', () => {
   const state = createState();
   assert.deepEqual(state.kir, []);
   assert.deepEqual(state.kpr, []);
+  assert.deepEqual(state.partners, []);
+  assert.equal(state.nextPartnerId, 1);
   assert.deepEqual(state.general, {
     taxPayerID: '',
     periodType: 'monthly',
@@ -154,4 +160,109 @@ test('KIR and KPR lists are independent: mutating one does not affect the other'
   assert.equal(state.kir.length, 0);
   assert.equal(state.kpr.length, 2);
   assert.deepEqual(state.kpr.map((e) => e.zapSt), [1, 2]);
+});
+
+// --- Partners (plan 0006 §3, §5.2) ------------------------------------------
+
+test('addPartner appends the partner, assigns id 1 to the first partner, and returns that id', () => {
+  const state = createState();
+  const id = addPartner(state, { name: 'Acme d.o.o.', countryCode: 'SI', vatId: '11111111' });
+  assert.equal(id, 1);
+  assert.deepEqual(state.partners, [{ id: 1, name: 'Acme d.o.o.', countryCode: 'SI', vatId: '11111111' }]);
+});
+
+test('addPartner assigns consecutive ids starting at 1, ordered by id ascending', () => {
+  const state = createState();
+  const idA = addPartner(state, { name: 'A', countryCode: 'SI', vatId: '11111111' });
+  const idB = addPartner(state, { name: 'B', countryCode: 'DE', vatId: '22222222' });
+  const idC = addPartner(state, { name: 'C', countryCode: 'AT', vatId: '33333333' });
+  assert.deepEqual([idA, idB, idC], [1, 2, 3]);
+  assert.deepEqual(state.partners.map((p) => p.id), [1, 2, 3]);
+});
+
+test('updatePartner merges a patch into the partner matching id, leaving others untouched', () => {
+  const state = createState();
+  const idA = addPartner(state, { name: 'A', countryCode: 'SI', vatId: '11111111' });
+  const idB = addPartner(state, { name: 'B', countryCode: 'DE', vatId: '22222222' });
+  updatePartner(state, idA, { name: 'A updated' });
+  assert.equal(state.partners.find((p) => p.id === idA).name, 'A updated');
+  assert.equal(state.partners.find((p) => p.id === idA).countryCode, 'SI');
+  assert.equal(state.partners.find((p) => p.id === idB).name, 'B');
+});
+
+test('updatePartner throws when the id does not exist', () => {
+  const state = createState();
+  assert.throws(() => updatePartner(state, 999, { name: 'X' }));
+});
+
+test('removePartner removes the matching partner and leaves the rest, without renumbering ids', () => {
+  const state = createState();
+  const idA = addPartner(state, { name: 'A', countryCode: 'SI', vatId: '11111111' });
+  const idB = addPartner(state, { name: 'B', countryCode: 'DE', vatId: '22222222' });
+  const idC = addPartner(state, { name: 'C', countryCode: 'AT', vatId: '33333333' });
+
+  removePartner(state, idB);
+
+  assert.deepEqual(state.partners.map((p) => p.id), [idA, idC]);
+});
+
+test('removePartner throws when the id does not exist', () => {
+  const state = createState();
+  assert.throws(() => removePartner(state, 999));
+});
+
+test('removePartner does not decrement nextPartnerId (no in-session id reuse)', () => {
+  const state = createState();
+  const idA = addPartner(state, { name: 'A', countryCode: 'SI', vatId: '11111111' });
+  addPartner(state, { name: 'B', countryCode: 'DE', vatId: '22222222' });
+
+  removePartner(state, idA);
+  const idC = addPartner(state, { name: 'C', countryCode: 'AT', vatId: '33333333' });
+
+  assert.equal(idC, 3);
+});
+
+test('deleting the highest-id partner then adding another in the same session does not reuse its id', () => {
+  const state = createState();
+  addPartner(state, { name: 'A', countryCode: 'SI', vatId: '11111111' });
+  const idB = addPartner(state, { name: 'B', countryCode: 'DE', vatId: '22222222' });
+
+  removePartner(state, idB);
+  const idNext = addPartner(state, { name: 'C', countryCode: 'AT', vatId: '33333333' });
+
+  assert.equal(idNext, 3);
+});
+
+test('seedPartners replaces state.partners and seeds nextPartnerId to one past the highest loaded id', () => {
+  const state = createState();
+  seedPartners(state, [
+    { id: 2, name: 'A', countryCode: 'SI', vatId: '11111111' },
+    { id: 5, name: 'B', countryCode: 'DE', vatId: '22222222' },
+  ]);
+  assert.equal(state.partners.length, 2);
+  assert.equal(state.nextPartnerId, 6);
+
+  const newId = addPartner(state, { name: 'C', countryCode: 'AT', vatId: '33333333' });
+  assert.equal(newId, 6);
+});
+
+test('seedPartners with an empty array seeds nextPartnerId to 1', () => {
+  const state = createState();
+  seedPartners(state, []);
+  assert.equal(state.partners.length, 0);
+  assert.equal(state.nextPartnerId, 1);
+});
+
+test('reload reuse: seeding from a stored list after deleting the highest-id partner reuses that id (acceptable per plan §3.3)', () => {
+  const state = createState();
+  addPartner(state, { name: 'A', countryCode: 'SI', vatId: '11111111' });
+  const idB = addPartner(state, { name: 'B', countryCode: 'DE', vatId: '22222222' });
+  removePartner(state, idB);
+
+  // Simulate a reload: a fresh state seeded from what remains in storage.
+  const reloaded = createState();
+  seedPartners(reloaded, state.partners.map((p) => ({ ...p })));
+  const reusedId = addPartner(reloaded, { name: 'C', countryCode: 'AT', vatId: '33333333' });
+
+  assert.equal(reusedId, 2);
 });
