@@ -3,12 +3,14 @@ import { test } from 'node:test';
 
 import {
   hasAnyErrors,
+  hasPartnerErrors,
   validateAmount,
   validateCountryCode,
   validateDateNotFuture,
   validateGeneral,
   validateKirEntry,
   validateKprEntry,
+  validatePartner,
   validatePeriodType,
   validatePeriodUnit,
   validatePeriodYear,
@@ -292,6 +294,58 @@ test('validateKprEntry flags missing required supplier fields', () => {
 test('validateKprEntry flags a supplierVatId with a country-code prefix', () => {
   const errors = validateKprEntry(validKprEntry({ supplierVatId: 'SI12345678' }));
   assert.ok(errors.supplierVatId);
+});
+
+// --- validatePartner / hasPartnerErrors ---------------------------------------------
+
+function validPartner(overrides = {}) {
+  return {
+    name: 'Acme d.o.o.',
+    countryCode: 'SI',
+    vatId: '12345678',
+    ...overrides,
+  };
+}
+
+test('validatePartner returns no errors for a fully valid partner', () => {
+  assert.deepEqual(validatePartner(validPartner()), {});
+});
+
+test('validatePartner requires name, countryCode, and vatId (no optional fields)', () => {
+  const errors = validatePartner({ name: '', countryCode: '', vatId: '' });
+  assert.ok(errors.name);
+  assert.ok(errors.countryCode);
+  assert.ok(errors.vatId);
+});
+
+test('validatePartner rejects an unrecognized countryCode', () => {
+  const errors = validatePartner(validPartner({ countryCode: 'US' }));
+  assert.ok(errors.countryCode);
+});
+
+test('validatePartner accepts GR and EL as countryCode', () => {
+  assert.deepEqual(validatePartner(validPartner({ countryCode: 'GR' })), {});
+  assert.deepEqual(validatePartner(validPartner({ countryCode: 'EL' })), {});
+});
+
+test('validatePartner rejects a vatId with a leading country-code prefix', () => {
+  const errors = validatePartner(validPartner({ vatId: 'SI12345678' }));
+  assert.ok(errors.vatId);
+});
+
+test('validatePartner rejects a vatId over 25 characters', () => {
+  const errors = validatePartner(validPartner({ vatId: '1'.repeat(26) }));
+  assert.ok(errors.vatId);
+});
+
+test('validatePartner rejects a name over 250 characters', () => {
+  const errors = validatePartner(validPartner({ name: 'a'.repeat(251) }));
+  assert.ok(errors.name);
+});
+
+test('hasPartnerErrors is false for an empty error map and true otherwise', () => {
+  assert.equal(hasPartnerErrors({}), false);
+  assert.equal(hasPartnerErrors({ name: 'required' }), true);
 });
 
 // --- validateState / hasAnyErrors ---------------------------------------------------
