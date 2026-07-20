@@ -449,13 +449,13 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2rem;
+  height: 2rem;
   border: 1px solid var(--accent);
-  border-radius: 50%;
+  border-radius: 4px;
   background: var(--surface);
   color: var(--accent);
-  font-size: 1.3rem;
+  font-size: 1.2rem;
   line-height: 1;
 }
 
@@ -524,8 +524,11 @@ button {
   color: var(--muted);
 }
 
-.partner-delete-button .partner-icon-button-icon::before {
-  content: "\1F5D1";
+.partner-icon-button-icon svg {
+  display: block;
+}
+
+.partner-delete-button .partner-icon-button-icon svg {
   color: var(--error);
 }
 
